@@ -1701,6 +1701,8 @@ button.n-row { cursor: pointer; }
 .wz-bank-t { display: flex; flex-direction: column; min-width: 0; }
 .wz-bank-t small { font-size: 12px; color: var(--muted); }
 .wz-bank-t b { font-size: 14.5px; font-weight: 600; }
+.wz-open { cursor: default; }
+.wz-open-in { width: 132px !important; flex: none; margin-left: auto; padding: 8px 10px !important; font-size: 16px !important; }
 
 .wz-choice-lg { flex: none; display: grid; place-items: center; }
 .wz-line .lg { margin-right: 2px; }
@@ -7171,7 +7173,6 @@ function wzFlow() {
   f.push('c-rev');
   Object.keys(getBudget().groups).forEach(k => f.push('c-grp:' + k));
   f.push('c-annual', 'c-sum', 'g-intro', 'g-goals', 's-intro', 's-plan', 'u-intro', 'u-birth', 'u-fam', 'u-kids', 'u-pro', 'u-tmi', 'u-log', 'u-risk');
-  if (S.envs.some(e => OPEN_TYPES.includes(e.type))) f.push('u-open');
   f.push('end');
   return f;
 }
@@ -7238,9 +7239,18 @@ function wzEsStep(e, i) {
       e.lines.length ? h('div', { class: 'wz-total' }, h('span', null, 'Total'), h('strong', null, E0.format(a.v))) : null,
       h('button', { class: 'wz-add', onclick: () => openAssetFlow(e, null, { mode: 'manual' }) }, getIcon('plus', 16), 'Ajouter un fonds non coté'),
       h('button', { class: 'wz-add', style: 'margin-top: 10px;', onclick: () => openAssetFlow(e, null, { mode: 'quoted', noFee: true }) }, getIcon('trending-up', 16), 'Ajouter un fonds coté en Bourse'),
+      wzOpenRow(e),
       wzLink('Modifier mes plans (PEE / PER)', () => { Q.sel = null; stage('plans'); }, 'edit')],
     onBack: () => stage('kinds')
   };
+}
+// Date d'ouverture d'un PEA, d'une assurance vie ou d'une épargne salariale (facultative, v60) : demandée avec le compte
+function wzOpenRow(e) {
+  const Pr = prof(); Pr.open = Pr.open || {};
+  const i = h('input', { type: 'month', class: 'wz-open-in', value: Pr.open[e.id] || '', max: new Date().toISOString().slice(0, 7), 'aria-label': `Date d’ouverture de ${e.name}` });
+  i.onchange = () => { if (i.value) Pr.open[e.id] = i.value; else delete Pr.open[e.id]; wzSave(); };
+  return h('label', { class: 'wz-bank wz-open' }, h('span', { class: 'n-acc-i', style: 'width: 30px; height: 30px;' }, getIcon('calendar', 15)),
+    h('span', { class: 'wz-bank-t' }, h('small', null, 'Facultatif'), h('b', null, e.type === 'es' ? 'Premier versement' : 'Date d’ouverture')), i);
 }
 const wzEnvFee = e => !(TYPES[e.type].nc || ['im', 'cf', 'au', 'crypto'].includes(e.type));
 const wzFundLines = e => e.lines.filter(l => l.m && ['ETF', 'Fonds'].includes(l.kind));
@@ -7654,15 +7664,6 @@ const WZ_STEPS = {
   'u-tmi': () => wzProfPick('tmi', PROF_TMI, 'Votre tranche d’imposition', 'Elle figure sur votre avis d’impôt (« taux marginal d’imposition »). Indispensable pour comparer PER, assurance vie et compte-titres.', true),
   'u-log': () => wzProfPick('log', PROF_LOG, 'Votre logement', null),
   'u-risk': () => wzProfPick('risk', PROF_RISK, 'Votre goût du risque', 'Face à une baisse des marchés, vous êtes plutôt…'),
-  'u-open': () => {
-    const Pr = prof(); Pr.open = Pr.open || {};
-    const rows = S.envs.filter(e => OPEN_TYPES.includes(e.type)).map(e => {
-      const i = h('input', { type: 'month', value: Pr.open[e.id] || '', max: new Date().toISOString().slice(0, 7), 'aria-label': `Date d’ouverture de ${e.name}` });
-      i.onchange = () => { if (i.value) Pr.open[e.id] = i.value; else delete Pr.open[e.id]; wzSave(); };
-      return h('div', { class: 'form-group', style: 'margin-bottom: 12px;' }, h('label', { class: 'form-label' }, e.name), i);
-    });
-    return { kicker: 'Facultatif', title: 'Depuis quand avez-vous ces contrats ?', lead: 'L’ancienneté change l’impôt : 5 ans pour un PEA, 8 ans pour une assurance vie. Le mois et l’année suffisent.', body: rows, next: { label: 'Continuer' } };
-  },
   /* ===== Accueil ===== */
   welcome: () => ({
     center: true, back: false,
@@ -7842,7 +7843,7 @@ const WZ_STEPS = {
       body: [...body, e.type !== 'im' ? h('button', { type: 'button', class: 'wz-bank', onclick: () => openBankPicker(e) },
         bankLogo(e, 30) || h('span', { class: 'n-acc-i', style: 'width: 30px; height: 30px;' }, getIcon('building', 15)),
         h('span', { class: 'wz-bank-t' }, h('small', null, ['cf', 'au', 'crypto'].includes(e.type) ? 'Plateforme' : 'Banque'), h('b', null, e.bank || 'Choisir (facultatif)')),
-        getIcon('chevron-right', 16)) : null, wzMore('Plus d’options', ...more)].filter(Boolean),
+        getIcon('chevron-right', 16)) : null, OPEN_TYPES.includes(e.type) ? wzOpenRow(e) : null, wzMore('Plus d’options', ...more)].filter(Boolean),
       skip: e.lines.length ? null : 'Je ne sais pas, passer',
       next: e.type === 'av' ? { label: 'Continuer', fn: () => { WZ_DRAFT['avst' + id] = 'rate'; wzDraw(true); } } : undefined
     };
