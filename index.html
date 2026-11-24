@@ -434,6 +434,7 @@ input[type="text"],
 input[type="number"],
 input[type="url"],
 input[type="date"],
+input[type="month"],
 input[type="search"],
 select,
 textarea {
@@ -1683,6 +1684,13 @@ button.n-row { cursor: pointer; }
 .ai-sep { height: 1px; background: var(--border); margin: 4px 0; }
 .ai-apps a.ai-app.on { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
 .ai-manual:empty { display: none; }
+.ai-prof { display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 12px; padding: 11px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
+.ai-prof > svg:first-child { color: var(--primary); flex: none; }
+.ai-prof > svg:last-child { color: var(--muted); flex: none; }
+.ai-prof span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ai-prof b { font-size: 14px; }
+.ai-prof small { font-size: 12px; color: var(--muted); }
+.prof-g { margin-bottom: 12px; }
 .ai-manual { margin-top: 10px; padding: 12px; border-radius: 14px; background: var(--surface-alt); display: flex; flex-direction: column; gap: 10px; }
 .ai-manual-h { font-size: 13px; line-height: 1.45; color: var(--ink); }
 .ai-manual-t { width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); resize: vertical; }
@@ -6916,6 +6924,8 @@ function openSettingsModal() {
         sec('Cours de la Bourse',
           h('div', { class: 'set-status' }, h('i', { class: live ? 'on' : '' }), live ? 'Cours en direct activés' : 'Cours en direct désactivés',
             live ? h('button', { class: 'btn btn-outline btn-sm', onclick: () => { refreshQuotes(true); } }, 'Actualiser') : h('button', { class: 'btn btn-primary btn-sm', onclick: () => { close(); openRelayModal(); } }, 'Activer'))),
+        sec('Demander à une IA',
+          h('div', { class: 'set-card' }, action('smile', 'Mon profil', 'Âge, impôts, contrats… pour des réponses d’IA plus précises', () => { close(); openProfileModal(); }))),
         sec('Mes données',
           h('div', { class: 'set-note' }, 'Vos données restent sur cet appareil, dans ce navigateur. Faites une sauvegarde de temps en temps.'),
           h('div', { class: 'set-card' },
@@ -9062,10 +9072,23 @@ function buildAIPrompt(question, anon) {
   return out.join('\n');
 }
 
+// Profil facultatif (v58) : sert uniquement au message envoyé aux IA
+const PROF_FAM = { seul: 'Célibataire', couple: 'En couple (non marié·e ni pacsé·e)', marie: 'Marié·e ou pacsé·e', autre: 'Autre' };
+const PROF_PRO = { salarie: 'Salarié·e du privé', fonct: 'Fonctionnaire', indep: 'Indépendant·e ou chef·fe d’entreprise', etud: 'Étudiant·e', sans: 'Sans emploi', retraite: 'Retraité·e' };
+const PROF_TMI = { 0: '0 % (non imposable)', 11: '11 %', 30: '30 %', 41: '41 %', 45: '45 %' };
+const PROF_LOG = { proprio: 'Propriétaire de ma résidence principale', loc: 'Locataire', heb: 'Hébergé·e (famille, logement de fonction…)' };
+const PROF_RISK = { prudent: 'Prudent : je ne supporte pas de voir mon épargne baisser', equilibre: 'Équilibré : j’accepte des baisses passagères pour gagner plus', dynamique: 'Dynamique : je vise le long terme et supporte de fortes baisses' };
+const OPEN_TYPES = ['pea', 'av', 'es'];
+const prof = () => (S.prof = S.prof || {});
+const profDone = () => { const p = S.prof || {}; return ['birth', 'fam', 'pro', 'tmi', 'log', 'risk'].filter(k => p[k] != null && p[k] !== '').length >= 4; };
+const ymLabel = ym => { const [y, m] = String(ym || '').split('-').map(Number); return y && m ? `${MONTHS_L[m - 1]} ${y}` : ''; };
+const ageOf = ym => { const [y, m] = String(ym || '').split('-').map(Number); if (!y) return null; const n = new Date(), mo = (n.getFullYear() - y) * 12 + n.getMonth() + 1 - (m || 1); return mo >= 0 ? mo : null; };
+const yrsMo = mo => { const y = Math.floor(mo / 12), r = mo % 12; return [y ? `${y} an${y > 1 ? 's' : ''}` : '', r ? `${r} mois` : ''].filter(Boolean).join(' et ') || 'moins d’un mois'; };
+
 // Version détaillée (copiée, sans limite de taille)
 function buildAIPromptFull(question, anon) {
-  const f = v => nE(v), pc = v => fr1(v) + ' %', today = new Date();
-  const K = keyFigures(), B = K.B, a = K.a, out = [];
+  const f = v => nE(v), pc = v => fr1(v) + ' %', spc = v => (v >= 0 ? '+ ' : '− ') + fr1(Math.abs(v)) + ' %', today = new Date();
+  const K = keyFigures(), B = K.B, a = K.a, out = [], Pr = prof();
   const bankAlias = {}, envAlias = {};
   let bn = 0;
   S.envs.forEach((e, i) => {
@@ -9076,6 +9099,14 @@ function buildAIPromptFull(question, anon) {
   const bankName = e => e.bank ? (anon ? bankAlias[e.bank] : e.bank) : 'non précisée';
   const lineName = (e, l, k) => (!l.m && anon && ['im', 'au', 'cf'].includes(e.type)) ? `Bien ${k + 1}` : l.name;
   const P = s => out.push(s);
+  const finEnvs = S.envs.filter(e => TYPES[e.type].c !== 'Immobilier'), finTot = agg(finEnvs.flatMap(e => e.lines)).v;
+  const inflKnown = typeof S.inflOv === 'number' || inflOk();
+  const G = gl(), X = goalCalc(), D = healthData(), PD = passiveData();
+  const open = G.filter(g => !isGoalDone(g, X[g.id] || { funded: 0 }));
+  const goalMonthly = open.reduce((t, g) => t + goalEffort(g, X[g.id] || { funded: 0 }).effort, 0);
+  const monthly = [...propertyLines().map(x => x.l.loan).filter(L => L && L.amt > 0 && !L.partial), ...loansList().filter(L => L.amt > 0 && !L.partial)].map(L => loanCalc(L)).filter(c => c.crd > 0).reduce((t, c) => t + c.tot, 0);
+  const mortM = propertyLines().map(x => x.l.loan).filter(L => L && L.amt > 0 && !L.partial).map(L => loanCalc(L)).filter(c => c.crd > 0).reduce((t, c) => t + c.tot, 0);
+  const unknown = [];
 
   // question === null : données seules, la question viendra dans le message suivant
   if (question !== null) { P('## Ma question'); P(question || AI_QUESTIONS[0]); P(''); }
@@ -9086,35 +9117,93 @@ function buildAIPromptFull(question, anon) {
     P('Ma question arrivera dans mon prochain message : tu y répondras alors en t’appuyant sur ces données.');
     P('');
   }
-  P('Tu es un conseiller en gestion de patrimoine pédagogue. Voici la situation financière complète d’un particulier, exportée de son application de suivi « snowball ».');
-  P('Réponds en français, simplement, avec des chiffres tirés de ces données, en expliquant les termes techniques. Rappelle que ce n’est pas un conseil en investissement personnalisé.');
-  P(`Données au ${today.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}. Montants en euros.`);
+  P('## Ton rôle et tes règles de réponse');
+  P('Tu es un conseiller en gestion de patrimoine indépendant et pédagogue, spécialiste de la fiscalité française. Voici la situation financière complète d’un particulier résidant en France, exportée de son application de suivi « snowball ».');
+  P('- Réponds en français, simplement, en expliquant chaque terme technique.');
+  P('- Appuie-toi sur les chiffres ci-dessous et cite-les. Sois concret : compte par compte, ligne par ligne, avec des montants en euros et un ordre de priorité.');
+  P('- Avant de conseiller de vendre ou de déplacer de l’argent, calcule l’impôt et les frais que cela coûterait, et compare avec le gain attendu.');
+  P('- Tiens compte de mon profil, de mes projets (dates et montants) et de l’argent dont je peux avoir besoin rapidement.');
+  P('- Si une information manque (voir « Ce que l’appli ne sait pas »), dis-le et pose une hypothèse claire plutôt que d’inventer.');
+  P('- Termine par 3 actions maximum, chiffrées et datées. Rappelle en une phrase que ce n’est pas un conseil en investissement personnalisé.');
+  P(`Données au ${today.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}. Montants en euros. « Valeur » = valeur actuelle ; « investi » = somme versée ou prix d’achat total.`);
   P('');
+
+  P('## En bref');
+  P(`- Patrimoine net : ${f(K.net)} (biens ${f(a.v)}, dont ${f(finTot)} de placements financiers ; crédits restant dus ${f(K.debt)})`);
+  if (B.rev > 0) P(`- Revenus nets ${f(B.rev)} par mois · dépenses ${f(K.spend)} · épargne possible ${f(K.cap)} par mois (${pc(K.cap / B.rev * 100)} des revenus)`);
+  if (monthly > 0) P(`- Mensualités de crédit : ${f(monthly)} par mois${B.rev > 0 ? ` (${pc(monthly / B.rev * 100)} des revenus)` : ''}${mortM > 0 && mortM < monthly - 0.5 ? `, dont crédit immobilier ${f(mortM)}${B.rev > 0 ? ` (${pc(mortM / B.rev * 100)})` : ''}` : ''}`);
+  const cls = CLASSES.map(c => [c, agg(classEnvs(c).flatMap(e => e.lines)).v]).filter(x => x[1] > 0).sort((p, q) => q[1] - p[1]);
+  if (a.v > 0) P(`- Répartition : ${cls.map(([c, v]) => `${c} ${Math.round(v / a.v * 100)} %`).join(', ')}`);
+  if (open.length) P(`- Projets en cours : ${open.length}, effort total ${f(goalMonthly)} par mois`);
+  if (D) P(`- Santé financière calculée par l’appli : ${D.score}/100`);
+  P('');
+
+  P('## Mon profil');
+  const pl = [];
+  if (Pr.birth) { const mo = ageOf(Pr.birth + '-01'); if (mo != null) pl.push(`- Âge : ${Math.floor(mo / 12)} ans (né·e en ${Pr.birth})`); } else unknown.push('mon âge');
+  if (Pr.fam) pl.push(`- Situation familiale : ${PROF_FAM[Pr.fam]}${Pr.kids != null && Pr.kids !== '' ? ` · enfants à charge : ${Pr.kids}` : ''}`); else unknown.push('ma situation familiale et mes enfants à charge');
+  if (Pr.pro) pl.push(`- Situation professionnelle : ${PROF_PRO[Pr.pro]}`); else unknown.push('ma situation professionnelle');
+  if (Pr.tmi != null && Pr.tmi !== '') pl.push(`- Tranche marginale d’imposition : ${PROF_TMI[Pr.tmi]}`); else unknown.push('ma tranche d’imposition (indispensable pour comparer PER, assurance vie et compte-titres)');
+  if (Pr.log) pl.push(`- Logement : ${PROF_LOG[Pr.log]}`); else unknown.push('si je suis propriétaire de ma résidence principale');
+  if (Pr.risk) pl.push(`- Goût du risque : ${PROF_RISK[Pr.risk]}`); else unknown.push('mon goût du risque');
+  pl.forEach(P); if (!pl.length) P('- Non renseigné.');
+  P('');
+
   P('## Vue d’ensemble');
-  P(`- Patrimoine net : ${f(K.net)} (biens ${f(a.v)}, crédits restant dus − ${f(K.debt)}, impôts latents si tout était vendu − ${f(K.sm.t)})`);
-  if (K.d30 != null) P(`- Évolution du patrimoine net : ${sE(K.d30)} sur 30 jours${K.d365 != null ? `, ${sE(K.d365)} sur 12 mois` : ''}`);
+  P(`- Patrimoine net : ${f(K.net)} = biens ${f(a.v)} − crédits restant dus ${f(K.debt)} − impôts latents si tout était vendu aujourd’hui ${f(K.sm.t)}`);
+  if (K.d30 != null) P(`- Évolution du patrimoine net : ${sE(K.d30)} sur 30 jours${K.d365 != null ? `, ${sE(K.d365)} sur 12 mois` : ''} (épargne versée et variations des marchés confondues)`);
   P(`- Frais annuels des placements : ${f(K.sm.f)} par an (${a.v > 0 ? pc(K.sm.f / a.v * 100) : '0 %'} du patrimoine)`);
-  P(`- Inflation retenue : ${pc(infl())}`);
+  P(`- Inflation : ${inflKnown ? pc(infl()) + ' sur un an' : 'non disponible (l’appli n’a pas pu la charger)'}`);
   P('');
+
   P('## Répartition par classe d’actifs (actuelle et visée)');
   const T = S.target || {};
   CLASSES.forEach(c => { const v = agg(classEnvs(c).flatMap(e => e.lines)).v; if (v > 0 || T[c]) P(`- ${c} : ${f(v)} soit ${a.v > 0 ? pc(v / a.v * 100) : '0 %'}${T[c] != null ? ` · objectif ${T[c]} %` : ''}`); });
   if (!CLASSES.some(c => T[c] != null)) P('- Aucune répartition visée définie.');
   P('');
+
+  // Évolution par classe (historique quotidien de l'appli)
+  const H = S.hist || [], last = H[H.length - 1];
+  if (last && last.c) {
+    const pts = [[3, 'il y a 3 mois'], [6, 'il y a 6 mois'], [12, 'il y a 12 mois']].map(([m, l]) => [histAt(Date.now() - m * 30.4 * 864e5), l]).filter(([r]) => r && r.c && r.d !== last.d);
+    if (pts.length) {
+      P('## Évolution par classe d’actifs (historique de l’appli, versements compris)');
+      CLASSES.forEach(c => { const now = last.c[c] || 0; if (!now && !pts.some(([r]) => r.c[c])) return; P(`- ${c} : ${f(now)} aujourd’hui · ${pts.map(([r, l]) => `${f(r.c[c] || 0)} ${l}`).join(' · ')}`); });
+      P(`- Patrimoine net : ${f(last.v)} aujourd’hui · ${pts.map(([r, l]) => `${f(r.v)} ${l}`).join(' · ')}`);
+      P('');
+    }
+  }
+
   P('## Comptes et placements');
+  P(`Le « poids » d’une ligne est sa part dans les placements financiers (hors immobilier : ${f(finTot)}).`);
   S.envs.forEach(e => {
-    const x = agg(e.lines), gain = x.v - x.c;
-    P(`### ${envName(e)}${anon ? '' : ' · ' + TYPES[e.type].n} · banque : ${bankName(e)}`);
-    P(`- Valeur ${f(x.v)}${x.c > 0 && !TYPES[e.type].nc ? ` · investi ${f(x.c)} · plus-value ${sE(gain)} (${pc(gain / x.c * 100)})` : ''}`);
-    if (TYPES[e.type].nc) P(`- Taux du livret : ${pc(livretRate(e))}`);
+    const x = agg(e.lines), gain = x.v - x.c, Ty = TYPES[e.type];
+    P(`### ${envName(e)}${anon ? '' : ' · ' + Ty.n}${e.type === 'es' && e.plan ? ` (${e.plan === 'per' ? 'PER collectif, bloqué jusqu’à la retraite' : 'PEE, bloqué 5 ans'})` : ''} · banque : ${bankName(e)}`);
+    P(`- Valeur ${f(x.v)}${x.c > 0 && !Ty.nc ? ` · investi ${f(x.c)} · plus-value ${sE(gain)} (${spc(gain / x.c * 100)})` : ''}${Ty.c !== 'Immobilier' && finTot > 0 ? ` · poids ${pc(x.v / finTot * 100)}` : ''}`);
+    if (OPEN_TYPES.includes(e.type)) {
+      const mo = ageOf(Pr.open && Pr.open[e.id]);
+      if (mo != null) P(`- Ouvert en ${ymLabel(Pr.open[e.id])}, il y a ${yrsMo(mo)}${e.type === 'pea' ? (mo >= 60 ? ' : plus de 5 ans, gains exonérés d’impôt sur le revenu' : ' : moins de 5 ans') : e.type === 'av' ? (mo >= 96 ? ' : plus de 8 ans, abattement annuel sur les gains' : ' : moins de 8 ans') : ''}`);
+      else unknown.push(`la date d’ouverture du compte « ${envName(e)} »`);
+    }
+    if (Ty.nc) {
+      const cap = e.type === 'la' ? LIVRET_A_CAP : null;
+      P(`- Taux du livret : ${pc(livretRate(e))}${cap ? ` · plafond ${f(cap)}, encore ${f(Math.max(0, cap - x.v))} de place` : ' · plafond 12 000 € (LDDS) ou 1 600 € (Livret jeune)'}`);
+    }
+    if (e.type === 'pea') P(`- Versements estimés (montant investi) : ${f(x.c)} sur un plafond de 150 000 €, encore environ ${f(Math.max(0, 150000 - x.c))} de place`);
     if (e.type === 'av' && e.avRate != null) P(`- Taux du fonds euros : ${pc(e.avRate)}`);
     const fe = fees(e), tx = taxe(e);
-    if (!TYPES[e.type].nc) P(`- Frais : ${f(fe)} par an${e.fee != null ? ` (frais du compte ${pc(e.fee)})` : ''} · impôt sur les gains : ${e.tax != null ? pc(e.tax) : 'non renseigné'} · impôt latent ${f(tx)}`);
+    if (!Ty.nc) P(`- Frais : ${f(fe)} par an${e.fee != null ? ` (frais du compte ${pc(e.fee)})` : ''} · impôt sur les gains : ${e.tax != null ? pc(e.tax) : 'non renseigné'} · impôt latent ${f(tx)}`);
+    if (x.miss) P(`- Attention : ${x.miss} ligne${x.miss > 1 ? 's' : ''} sans cours à jour, non comptée${x.miss > 1 ? 's' : ''} dans la valeur`);
     e.lines.forEach((l, k) => {
-      const v = val(l), dv = divs(l);
-      if (l.m) P(`  - ${lineName(e, l, k)} (${l.sym}${l.isin ? ', ' + l.isin : ''}, ${l.kind || 'titre'}) : ${N.format(l.qty)} × prix moyen ${E2.format(l.cost)}${v ? ` = ${f(v.v)}, plus-value ${sE(v.v - v.c)}` : ' (cours indisponible)'}${l.fee != null ? `, frais ${pc(l.fee)}/an` : ''}${dv > 0 ? `, dividendes reçus ${f(dv)}` : ''}`);
-      else P(`  - ${lineName(e, l, k)} : ${f(l.val || 0)}${l.cst ? ` (versé ${f(l.cst)})` : ''}`);
-      if (l.loan && l.loan.amt > 0 && !l.loan.partial) { const c = loanCalc(l.loan); P(`    - Crédit immobilier : ${f(l.loan.amt)} emprunté à ${pc(l.loan.rate)} sur ${l.loan.yrs} ans, mensualité ${f(c.tot)} (assurance comprise), reste dû ${f(c.crd)}, coût total ${f(c.cost)}, fin ${MONTHS_L[c.endM]} ${c.endY}`); }
+      const v = val(l), dv = divs(l), w = v && Ty.c !== 'Immobilier' && finTot > 0 ? ` · poids ${pc(v.v / finTot * 100)}` : '';
+      if (l.m) {
+        const q = M.q[l.sym], cur = q && q.price != null ? `${N.format(q.price)} ${q.currency === 'EUR' || !q.currency ? '€' : q.currency}` : null;
+        P(`  - ${lineName(e, l, k)} (${l.sym}${l.isin ? ', ' + l.isin : ''}, ${l.kind || 'titre'}) : ${N.format(l.qty)} ${l.kind === 'Crypto' ? 'unités' : l.kind === 'ETF' || l.kind === 'Fonds' ? 'parts' : 'actions'} · prix de revient moyen ${E2.format(l.cost)}${cur ? ` · cours actuel ${cur}` : ' · cours indisponible'}${v ? ` · valeur ${f(v.v)} · investi ${f(v.c)} · plus-value ${sE(v.v - v.c)}${v.c > 0 ? ` (${spc((v.v - v.c) / v.c * 100)})` : ''}` : ''}${w}${l.fee != null ? ` · frais ${pc(l.fee)}/an` : ''}${dv > 0 ? ` · dividendes reçus ${f(dv)}` : ''}`);
+      } else {
+        const g = (l.val || 0) - (l.cst || 0);
+        P(`  - ${lineName(e, l, k)} : ${f(l.val || 0)}${l.cst && !Ty.nc ? ` (versé ${f(l.cst)}, plus-value ${sE(g)}${l.cst > 0 ? `, ${spc(g / l.cst * 100)}` : ''})` : ''}${w}`);
+      }
+      if (l.loan && l.loan.amt > 0 && !l.loan.partial) { const c = loanCalc(l.loan); P(`    - Crédit immobilier : ${f(l.loan.amt)} emprunté à ${pc(l.loan.rate)} sur ${l.loan.yrs} ans, mensualité ${f(c.tot)} (assurance comprise), reste dû ${f(c.crd)} (${l.val > 0 ? pc(c.crd / l.val * 100) : '—'} de la valeur du bien, part déjà à vous ${f(Math.max(0, (l.val || 0) - c.crd))}), coût total ${f(c.cost)}, fin ${MONTHS_L[c.endM]} ${c.endY}`); }
       else if (l.loan && l.loan.partial) P(`    - Crédit : ${f(l.loan.amt)} restant dû (conditions non renseignées)`);
     });
   });
@@ -9122,22 +9211,35 @@ function buildAIPromptFull(question, anon) {
   if (L.length) {
     P('');
     P('## Autres crédits');
-    L.forEach(x => { if (x.partial) { P(`- ${anon ? 'Crédit' : x.name} : ${f(x.amt)} restant dû`); return; } const c = loanCalc(x); P(`- ${anon ? 'Crédit ' + (x.kind || '') : x.name} : ${f(x.amt)} à ${pc(x.rate)} sur ${x.yrs} ans, mensualité ${f(c.tot)}, reste dû ${f(c.crd)}, coût total ${f(c.cost)}`); });
+    const lname = x => anon ? (/^crédit/i.test(x.kind || '') ? x.kind : 'Crédit ' + (x.kind || '').toLowerCase()).trim() : x.name;
+    L.forEach(x => { if (x.partial) { P(`- ${lname(x)} : ${f(x.amt)} restant dû (conditions non renseignées)`); return; } const c = loanCalc(x); P(`- ${lname(x)} : ${f(x.amt)} emprunté à ${pc(x.rate)} sur ${x.yrs} ans, mensualité ${f(c.tot)}, reste dû ${f(c.crd)}, coût total ${f(c.cost)}, fin ${MONTHS_L[c.endM]} ${c.endY}`); });
   }
   P('');
+
+  P('## Disponibilité de l’argent');
+  const liq = { now: 0, days: 0, blk: 0, slow: 0 };
+  S.envs.forEach(e => { const v = agg(e.lines).v; if (TYPES[e.type].nc) liq.now += v; else if (e.type === 'es') liq.blk += v; else if (['im', 'cf'].includes(e.type)) liq.slow += v; else liq.days += v; });
+  P(`- Disponible tout de suite (livrets) : ${f(liq.now)}${K.spend > 0 ? `, soit ${fr1(liq.now / K.spend)} mois de dépenses` : ''}`);
+  P(`- Disponible en quelques jours, avec impôt éventuel sur les gains (PEA, compte-titres, assurance vie, crypto, autres) : ${f(liq.days)}`);
+  if (liq.blk) P(`- Bloqué (épargne salariale, sauf cas de déblocage anticipé) : ${f(liq.blk)}`);
+  if (liq.slow) P(`- Long à vendre (immobilier, crowdfunding) : ${f(liq.slow)}`);
+  P('');
+
   P('## Budget mensuel');
   if (B.rev > 0) {
     P(`- Revenus nets : ${f(B.rev)} par mois`);
     Object.values(B.groups).forEach(g => { const t = totalGroupSpend(g); if (t > 0) P(`- ${g.name} : ${f(t)} (${(g.items || []).filter(it => it.amt > 0).map(it => `${it.name} ${f(it.amt)}`).join(', ')})`); });
     P(`- Total des dépenses : ${f(K.spend)} · mises de côté programmées : ${f(K.prov)} · épargne possible : ${f(K.cap)} par mois`);
-  } else P('- Budget non renseigné.');
+    if (open.length) P(`- Épargne vraiment libre, une fois financés les projets en cours (${f(goalMonthly)} par mois) : ${f(K.cap - goalMonthly)} par mois`);
+  } else { P('- Budget non renseigné.'); unknown.push('mon budget (revenus et dépenses)'); }
   if ((B.annualBills || []).length) P(`- Grosses dépenses annuelles : ${B.annualBills.map(b => `${b.name} ${f(b.amt)} en ${MONTHS_L[b.dueMonth || 0]}`).join(', ')}`);
   P('');
+
   P('## Projets');
-  const G = gl(), X = goalCalc();
-  if (G.length) G.slice().sort((p, q) => p.date.localeCompare(q.date)).forEach(g => { const x = X[g.id] || { funded: 0 }, e = goalEffort(g, x); P(`- ${anon ? g.type || 'Projet' : g.name} : ${f(g.target)} pour ${fmtGoalDate(e.gd)}, déjà financé ${f(x.funded)}${isGoalDone(g, x) ? ' (atteint)' : `, effort nécessaire ${f(e.effort)} par mois pendant ${e.n} mois`}`); });
+  if (G.length) G.slice().sort((p, q) => p.date.localeCompare(q.date)).forEach(g => { const x = X[g.id] || { funded: 0 }, e = goalEffort(g, x); P(`- ${anon ? g.type || 'Projet' : g.name}${!anon && g.type && g.type !== g.name ? ` (${g.type})` : ''} : ${f(g.target)} pour ${fmtGoalDate(e.gd)}, dans ${yrsMo(Math.max(0, e.n))}, déjà financé ${f(x.funded)}${isGoalDone(g, x) ? ' (atteint)' : `, reste ${f(e.rest)}, effort nécessaire ${f(e.effort)} par mois`}${(g.envs || []).length ? ` · financé par ${g.envs.map(id => S.envs.find(z => z.id === id)).filter(Boolean).map(envName).join(', ')}` : ''}`); });
   else P('- Aucun projet.');
   P('');
+
   P('## Plan d’investissement de l’année');
   const Y = nowYear(), TS = getStrategy(Y), grp = {};
   TS.b.forEach(b => { const k = b.name + '|' + b.env; (grp[k] = grp[k] || { b, n: 0, done: 0 }).n++; if (b.done) grp[k].done++; });
@@ -9146,15 +9248,77 @@ function buildAIPromptFull(question, anon) {
     gs.forEach(({ b, n, done }) => { const e = S.envs.find(x => x.id === b.env); P(`- Achat de ${b.name} : ${f(b.amt)} par mois sur ${n} mois${e ? ` dans ${envName(e)}` : ''} (${done} faits)`); });
     TS.p.forEach(pp => { const e = S.envs.find(x => x.id === pp.env); P(`- Mise de côté « ${pp.name} » : ${f(pp.amt)} par mois${e ? ` vers ${envName(e)}` : ''}`); });
   } else P('- Aucun achat programmé.');
-  const PD = passiveData();
-  if (PD.tot > 0) { P(''); P('## Revenus passifs (12 derniers mois)'); P(`- Dividendes reçus : ${f(PD.div)} · intérêts estimés : ${f(PD.interest)} · total ${f(PD.tot)} par an`); }
-  const D = healthData();
-  if (D) { P(''); P(`## Santé financière calculée par l’appli : ${D.score}/100`); D.cr.forEach(c => P(`- ${c.n} : ${c.p}/25 · ${c.v || ''}`)); }
   P('');
-  P('Repères fiscaux 2026 utilisés : prélèvements sur les gains 18,6 % (PEA de plus de 5 ans), 31,4 % (compte-titres, crypto), assurance vie 17,2 % à 30 % selon l’ancienneté ; Livret A 1,7 %.');
-  if (question === null) { P(''); P('## Rappel'); P('Fin du contexte. Ne réponds rien d’autre que « Bien reçu. » : ni analyse, ni conseil, ni question. Ma question arrive dans le message suivant.'); }
+
+  const UP = upcoming();
+  if (UP.length) { P('## Dans les 60 prochains jours'); UP.forEach(u => P(`- ${u.d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} : ${u.t} (${u.s}) ${u.v.replace('≈ ', 'environ ')}`)); P(''); }
+
+  P('## Revenus passifs (12 derniers mois)');
+  P(`- Dividendes reçus : ${f(PD.div)} · intérêts estimés : ${f(PD.interest)} · total ${f(PD.tot)} par an`);
+  P('');
+
+  const LK = leakData();
+  if (LK.length) { P('## Ce qui fait fondre le patrimoine (calcul de l’appli sur 20 ans, à 4 % par an)'); LK.forEach(x => P(`- ${x.t} : ${f(x.v)} (${x.s})`)); P(''); }
+
+  P('## Projection (hypothèse : 4 % par an, avant inflation et impôts)');
+  const pv = Math.max(0, K.net), cap = Math.max(0, K.cap), planM = gs.reduce((t, { b, n }) => t + b.amt * n, 0) / 12 + TS.p.reduce((t, pp) => t + pp.amt, 0);
+  P(`- Sans rien ajouter : ${f(fvCalc(pv, 0, 0.04, 10))} dans 10 ans, ${f(fvCalc(pv, 0, 0.04, 20))} dans 20 ans`);
+  if (planM > 0) P(`- En gardant le plan actuel (environ ${f(planM)} par mois) : ${f(fvCalc(pv, planM, 0.04, 10))} dans 10 ans, ${f(fvCalc(pv, planM, 0.04, 20))} dans 20 ans`);
+  if (cap > 0) P(`- En investissant toute l’épargne possible (${f(cap)} par mois) : ${f(fvCalc(pv, cap, 0.04, 10))} dans 10 ans, ${f(fvCalc(pv, cap, 0.04, 20))} dans 20 ans`);
+  P('');
+
+  if (D) { P(`## Santé financière calculée par l’appli : ${D.score}/100`); D.cr.forEach(c => P(`- ${c.n} : ${c.p}/25 · ${c.v || ''}`)); P('Repères de l’appli : précaution 6 mois de dépenses, frais ≤ 0,3 % par an, épargne ≥ 20 % des revenus, aucune position > 25 % des placements, mensualités du crédit immobilier ≤ 25 % des revenus (35 % = limite des banques).'); P(''); }
+
+  P('## Repères fiscaux et réglementaires 2026 (France)');
+  P('- Prélèvements sociaux : 18,6 % sur les gains (17,2 % pour l’assurance vie et l’épargne salariale). Prélèvement forfaitaire unique (flat tax) : 31,4 % (12,8 % d’impôt + 18,6 %), ou option pour le barème progressif.');
+  P('- PEA : versements plafonnés à 150 000 € ; après 5 ans, gains exonérés d’impôt sur le revenu (seulement 18,6 %) ; retrait avant 5 ans = clôture et 31,4 % (sauf exceptions).');
+  P('- Assurance vie : avant 8 ans, 30 % sur les gains ; après 8 ans, abattement annuel de 4 600 € de gains (9 200 € pour un couple marié ou pacsé), puis 24,7 % (7,5 % + 17,2 %) jusqu’à 150 000 € de versements. Transmission : 152 500 € par bénéficiaire hors droits de succession pour les versements avant 70 ans.');
+  P('- PER : versements déductibles du revenu imposable (plafond d’environ 10 % des revenus professionnels), économie = versement × tranche marginale ; argent bloqué jusqu’à la retraite sauf achat de la résidence principale et accidents de la vie.');
+  P(`- Livret A : ${fr1(LIVRET_RATE)} % net, plafond ${f(LIVRET_A_CAP)} ; LDDS : même taux, plafond 12 000 € ; intérêts sans impôt.`);
+  P('- Compte-titres et crypto : 31,4 % sur les plus-values réalisées ; les moins-values compensent les plus-values (report 10 ans pour les titres).');
+  P('');
+
+  if (unknown.length) { P('## Ce que l’appli ne sait pas'); unknown.forEach(u => P(`- ${u.charAt(0).toUpperCase() + u.slice(1)}`)); P(''); }
+  if (question === null) { P('## Rappel'); P('Fin du contexte. Ne réponds rien d’autre que « Bien reçu. » : ni analyse, ni conseil, ni question. Ma question arrive dans le message suivant.'); }
   return out.join('\n');
 }
+
+// Fenêtre « Mon profil » (Réglages) : réponses facultatives, utilisées uniquement par « Demander à une IA »
+function openProfileModal(back) {
+  const root = $('#modal-root'), Pr = prof(); Pr.open = Pr.open || {};
+  const close = () => { root.innerHTML = ''; if (back) back(); };
+  const sel = (k, map, ph) => { const s = h('select', { 'aria-label': ph }, h('option', { value: '' }, ph), ...Object.entries(map).map(([v, t]) => h('option', { value: v }, t)));
+    s.value = Pr[k] != null ? String(Pr[k]) : ''; s.onchange = () => { if (s.value === '') delete Pr[k]; else Pr[k] = k === 'tmi' ? +s.value : s.value; save(); }; return s; };
+  const yNow = new Date().getFullYear();
+  const birth = h('select', { 'aria-label': 'Année de naissance' }, h('option', { value: '' }, 'Choisir…'), ...Array.from({ length: 90 }, (_, i) => yNow - 16 - i).map(y => h('option', { value: y }, String(y))));
+  birth.value = Pr.birth ? String(Pr.birth) : ''; birth.onchange = () => { if (birth.value) Pr.birth = +birth.value; else delete Pr.birth; save(); };
+  const kids = h('select', { 'aria-label': 'Enfants à charge' }, h('option', { value: '' }, 'Choisir…'), ...[0, 1, 2, 3, 4, 5].map(n => h('option', { value: n }, n === 5 ? '5 ou plus' : String(n))));
+  kids.value = Pr.kids != null ? String(Pr.kids) : ''; kids.onchange = () => { if (kids.value === '') delete Pr.kids; else Pr.kids = +kids.value; save(); };
+  const grp = (label, el, note) => h('div', { class: 'form-group prof-g' }, h('label', { class: 'form-label' }, label), el, note ? h('div', { class: 'set-note', style: 'margin: 0;' }, note) : null);
+  const dates = S.envs.filter(e => OPEN_TYPES.includes(e.type)).map(e => {
+    const i = h('input', { type: 'month', value: Pr.open[e.id] || '', max: new Date().toISOString().slice(0, 7), 'aria-label': `Date d’ouverture de ${e.name}` });
+    i.onchange = () => { if (i.value) Pr.open[e.id] = i.value; else delete Pr.open[e.id]; save(); };
+    return grp(e.name, i);
+  });
+  const m = h('div', { class: 'modal-overlay', onclick: ev => { if (ev.target === m) close(); } },
+    h('div', { class: 'modal-sheet', style: 'max-width: 520px;' },
+      h('div', { class: 'modal-header' }, h('div', { class: 'modal-title' }, 'Mon profil'), h('button', { class: 'btn-icon-only', 'aria-label': 'Fermer', onclick: close }, getIcon('x', 16))),
+      h('div', { class: 'modal-body' },
+        h('div', { class: 'set-note' }, 'Tout est facultatif. Ces réponses restent sur votre téléphone et servent seulement quand vous demandez l’avis d’une IA : elle pourra vous conseiller beaucoup plus précisément, surtout sur les impôts.'),
+        grp('Année de naissance', birth),
+        grp('Situation familiale', sel('fam', PROF_FAM, 'Choisir…')),
+        grp('Enfants à charge', kids),
+        grp('Situation professionnelle', sel('pro', PROF_PRO, 'Choisir…')),
+        grp('Tranche d’imposition', sel('tmi', PROF_TMI, 'Choisir…'), 'Elle figure sur votre avis d’impôt : « taux marginal d’imposition ».'),
+        grp('Logement', sel('log', PROF_LOG, 'Choisir…')),
+        grp('Goût du risque', sel('risk', PROF_RISK, 'Choisir…')),
+        dates.length ? h('div', { class: 'set-h', style: 'margin: 18px 0 4px;' }, 'Date d’ouverture de vos contrats') : null,
+        dates.length ? h('div', { class: 'set-note' }, 'Elle change l’impôt : 5 ans pour un PEA, 8 ans pour une assurance vie.') : null,
+        ...dates),
+      h('div', { class: 'modal-footer' }, h('button', { class: 'btn btn-primary', style: 'width: 100%;', onclick: () => { close(); toast('Profil enregistré', 'success'); } }, 'Terminé'))));
+  root.replaceChildren(m);
+}
+
 function openAIModal() {
   const root = $('#modal-root'), close = () => { root.innerHTML = ''; };
   const anon = h('input', { type: 'checkbox', checked: true });
@@ -9238,6 +9402,7 @@ function openAIModal() {
         tiles, manual,
         h('button', { type: 'button', class: 'ai-mlink', onclick: () => showManual(context(), ai, (APPS.find(a => a[0] === ai) || [])[1]) }, 'La copie ne marche pas ? Copier à la main'),
         h('label', { class: 'ai-anon' }, anon, h('span', null, h('b', null, 'Masquer les noms'), h('small', null, 'Banques, comptes et biens deviennent « Banque A », « PEA 1 »… Les montants restent.'))),
+        h('button', { type: 'button', class: 'ai-prof', onclick: () => openProfileModal(openAIModal) }, getIcon('smile', 16), h('span', null, h('b', null, 'Mon profil'), h('small', null, profDone() ? 'Complété : l’IA en tient compte' : 'Âge, impôts, contrats… pour des réponses plus précises')), getIcon('chevron-right', 16)),
         h('details', { class: 'ai-prev' }, h('summary', null, 'Voir les données'), stats, pre),
         h('div', { class: 'ai-sep' }),
         s2t, s2n,
