@@ -869,7 +869,7 @@ body { font-size: 16px; line-height: 1.55; }
   }
 }
 
-body { background-color: var(--bg-app); letter-spacing: -0.005em; }
+body { background-color: var(--bg-app); letter-spacing: -0.005em; font-variant-numeric: tabular-nums; }
 
 /* Barre du haut et marque */
 /* v62 : barre du haut opaque (plus d'effet flou sous l'heure et la batterie, en haut de l'écran) */
@@ -878,7 +878,48 @@ body { background-color: var(--bg-app); letter-spacing: -0.005em; }
 /* Typographie du logo pour le mot « snowball » partout dans l'appli (v61) */
 .sb { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.01em; color: var(--primary); white-space: nowrap; font-style: normal; }
 #brand-name { color: var(--primary); }
-.brand-icon { border-radius: 11px; background: var(--primary-light); color: var(--primary); box-shadow: none; }
+.brand-icon { border-radius: 9px; background: none; box-shadow: 0 0 0 1px var(--border); overflow: hidden; }
+.brand-icon svg { display: block; }
+/* Écran de lancement */
+#splash { position: fixed; inset: 0; z-index: 9999; background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; transition: opacity .35s ease; }
+#splash img { width: 96px; height: 96px; border-radius: 22px; box-shadow: 0 8px 24px rgba(37, 99, 235, .25); }
+#splash b { font-family: var(--font-display); font-weight: 600; font-size: 26px; letter-spacing: -0.01em; color: var(--primary); }
+#splash.out { opacity: 0; pointer-events: none; }
+/* v63 : fraîcheur, verrouillage, à propos, tirer pour actualiser, transitions */
+.n-fresh { display: flex; align-items: flex-start; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); line-height: 1.4; }
+.n-fresh svg { flex: none; margin-top: 1px; }
+#lock { position: fixed; inset: 0; z-index: 10000; background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: env(safe-area-inset-top, 0px) 24px env(safe-area-inset-bottom, 0px); transition: opacity .25s ease; }
+#lock.out { opacity: 0; }
+.lk-ic { width: 64px; height: 64px; border-radius: 16px; box-shadow: 0 6px 18px rgba(37, 99, 235, .22); }
+.lk-msg { font-size: 15px; font-weight: 600; color: var(--ink); }
+.lk-dots { display: flex; gap: 16px; }
+.lk-dots i { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--ink-secondary); }
+.lk-dots i.on { background: var(--ink); border-color: var(--ink); }
+.lk-dots.shake { animation: lkShake .4s; }
+@keyframes lkShake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+.lk-pad { display: grid; grid-template-columns: repeat(3, 72px); gap: 14px 22px; margin-top: 8px; }
+.lk-k { width: 72px; height: 72px; border-radius: 50%; border: 0; background: var(--surface-alt); color: var(--ink); font: inherit; font-size: 26px; font-weight: 500; cursor: pointer; }
+.lk-k:active { background: var(--border); }
+.lk-k.del { background: none; font-size: 22px; }
+.lk-forgot { border: 0; background: none; font: inherit; font-size: 13px; color: var(--muted); text-decoration: underline; cursor: pointer; margin-top: 6px; }
+.ab-top { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.ab-top img { width: 56px; height: 56px; border-radius: 14px; }
+.ab-top b { display: block; font-size: 22px; }
+.ab-top > div > span { font-size: 12.5px; color: var(--muted); }
+.ab-b { padding: 12px 0; border-top: 1px solid var(--border); }
+.ab-h { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14.5px; color: var(--ink); margin-bottom: 4px; }
+.ab-h svg { color: var(--primary); }
+.ab-b p { font-size: 13.5px; color: var(--ink-secondary); line-height: 1.5; margin: 4px 0 0; }
+.ptr { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 64px); z-index: 60; width: 36px; height: 36px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow-sm, 0 2px 8px rgba(0,0,0,.12)); display: grid; place-items: center; color: var(--muted); transform: translate(-50%, 0); pointer-events: none; }
+.ptr.ready { color: var(--primary); }
+.ptr.spin svg { animation: ptrSpin .8s linear infinite; color: var(--primary); }
+.ptr.gone { opacity: 0 !important; transition: opacity .2s; }
+@keyframes ptrSpin { to { transform: rotate(-360deg); } }
+.n-d svg { display: block; }
+#btn-eye[aria-pressed="true"] { color: var(--primary); }
+.n-view { animation: nViewIn .22s ease-out; }
+@keyframes nViewIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .n-view, .lk-dots.shake { animation: none; } #splash, #lock { transition: none; } }
 
 /* Boutons : pilules légères */
 .btn { border-radius: 999px; font-weight: 600; padding: 12px 20px; }
@@ -1330,6 +1371,7 @@ button.n-row { cursor: pointer; }
 .n-tt span { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.35; }
 .n-tt .n-tip { color: var(--up); font-weight: 600; }
 .n-val { text-align: right; flex: none; } .n-val b { display: block; font-weight: 600; font-variant-numeric: tabular-nums; } .n-val > span { display: block; font-size: 12px; }
+.ess-v .n-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; padding: 7px 12px; background: var(--surface); }
 .n-pill { font: inherit; font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px; background: var(--cl, var(--surface-alt)); color: var(--cc, var(--ink)); flex: none; border: 0; cursor: pointer; display: inline-block; }
 .n-bar { height: 7px; border-radius: 99px; background: var(--surface-alt); overflow: hidden; margin-top: 7px; } .n-bar i { display: block; height: 100%; border-radius: 99px; background: var(--cc); }
 .n-note { font-size: 11.5px; color: var(--muted-light); text-align: center; margin-top: 16px; }
@@ -1459,7 +1501,7 @@ button.n-row { cursor: pointer; }
 /* Courbe d'évolution de l'Accueil */
 .n-hc { margin-top: 8px; }
 .n-hc .n-curve { height: 110px; }
-.n-hc-empty { font-size: 13px; color: var(--muted); padding: 14px 0 6px; line-height: 1.45; }
+.n-hc-empty { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); padding: 14px 0 6px; line-height: 1.45; }
 .n-hc-d { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 4px; }
 .n-hc-leg { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; font-size: 12px; color: var(--ink-secondary); }
 .n-hc-leg button, .n-hc-tot { display: inline-flex; align-items: center; gap: 5px; font: inherit; color: inherit; background: none; border: 0; padding: 2px 0; cursor: pointer; }
@@ -1728,17 +1770,21 @@ button.n-row { cursor: pointer; }
 </head>
 <body>
 
+<!-- Écran de lancement (v63) : l'icône et le nom, le temps que l'appli se charge -->
+<div id="splash" aria-hidden="true"><img id="splash-i" alt=""><b>snowball</b><script>(function(){var l=document.querySelector('link[rel="apple-touch-icon"]');if(l)document.getElementById('splash-i').src=l.href;})();</script></div>
+
 <header class="topbar">
   <div class="topbar-content">
     <a href="#/" class="brand" title="Accueil">
-      <div class="brand-icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M7.6 10.2a4.8 4.8 0 0 1 3.4-3.1"/><circle cx="14.6" cy="14.2" r="0.6" fill="currentColor" stroke="none"/><circle cx="10.2" cy="15.6" r="0.5" fill="currentColor" stroke="none"/></svg>
+      <div class="brand-icon" aria-hidden="true">
+        <svg width="32" height="32" viewBox="0 0 180 180"><defs><linearGradient id="bi-bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2563EB"/><stop offset="1" stop-color="#4F46E5"/></linearGradient><radialGradient id="bi-ball" cx="0.38" cy="0.34" r="0.75"><stop offset="0" stop-color="#FFFFFF"/><stop offset="0.65" stop-color="#F1F5FF"/><stop offset="1" stop-color="#C7D2FE"/></radialGradient></defs><rect width="180" height="180" fill="url(#bi-bg)"/><path d="M0 142 C50 138 90 120 120 102 S160 70 180 64 L180 180 L0 180Z" fill="#fff"/><circle cx="90" cy="64" r="28" fill="url(#bi-ball)"/></svg>
       </div>
       <span id="brand-name">snowball</span>
     </a>
     
     <div class="topbar-actions">
       <!-- Bouton d'actualisation compact avec point de statut intégré -->
+      <button id="btn-eye" class="btn-icon-only" title="Masquer les montants" aria-label="Masquer ou afficher les montants" aria-pressed="false" onclick="toggleDiscreet()"></button>
       <button id="btn-refresh" class="btn-icon-only" style="position: relative;" title="Actualiser les cotations" onclick="handleRefreshClick()">
         <svg id="refresh-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
         <span id="refresh-status-dot" class="status-indicator offline" title="Relais Google Apps Script"></span>
@@ -2373,7 +2419,7 @@ function achievements(net) {
 
 function checkAchievements(list) {
   if (!S.ach) { S.ach = {}; list.forEach(x => { if (x.ok) S.ach[x.n] = 1; }); save(); return; }
-  list.forEach(x => { if (x.ok && !S.ach[x.n]) { S.ach[x.n] = 1; save(); toast('🏆 Succès débloqué : ' + x.n); confetti(); } });
+  list.forEach(x => { if (x.ok && !S.ach[x.n]) { S.ach[x.n] = 1; save(); toast('Succès débloqué : ' + x.n); confetti(); } });
 }
 
 function achCard(list) {
@@ -6924,13 +6970,17 @@ function openSettingsModal() {
           h('div', { class: 'set-status' }, h('i', { class: live ? 'on' : '' }), live ? 'Cours en direct activés' : 'Cours en direct désactivés',
             live ? h('button', { class: 'btn btn-outline btn-sm', onclick: () => { refreshQuotes(true); } }, 'Actualiser') : h('button', { class: 'btn btn-primary btn-sm', onclick: () => { close(); openRelayModal(); } }, 'Activer'))),
         sec('Mes données',
-          h('div', { class: 'set-note' }, 'Vos données restent sur cet appareil, dans ce navigateur. Faites une sauvegarde de temps en temps.'),
+          h('div', { class: 'set-note' }, `Vos données restent sur cet appareil, dans ce navigateur. ${S.lastBackup ? `Dernière sauvegarde ${agoTxt(S.lastBackup)}.` : 'Aucune sauvegarde pour l’instant : faites-en une.'}`),
           h('div', { class: 'set-card' },
             action('download', 'Sauvegarder mes données', 'Télécharge un fichier .json', exportData),
             action('upload', 'Restaurer une sauvegarde', 'Remplace les données actuelles', () => fileIn.click()),
             action('smile', 'Mon profil', 'Facultatif · utilisé seulement si vous demandez l’avis d’une IA', () => { close(); openProfileModal(); }),
             action('compass', 'Refaire le questionnaire d’accueil', 'Pour revoir ou compléter vos réponses', () => { close(); openWizard('welcome'); })),
           fileIn),
+        sec('Sécurité et confidentialité',
+          h('div', { class: 'set-card' },
+            action('lock', S.pinH ? 'Retirer le code' : 'Verrouillage par code', S.pinH ? 'Un code est demandé à l’ouverture' : 'Facultatif · un code à 4 chiffres à l’ouverture', () => { close(); openPinModal(); }),
+            action('info', 'Confidentialité et à propos', `Vos données, les sources, version ${APP_VERSION}`, () => { close(); openAboutModal(); }))),
         adv),
       h('div', { class: 'modal-footer' }, h('button', { class: 'btn btn-primary', style: 'width: 100%;', onclick: close }, 'Terminé'))));
   root.replaceChildren(modal);
@@ -6944,7 +6994,8 @@ function exportData() {
   document.body.append(a);
   a.click();
   a.remove();
-  toast('Export téléchargé');
+  S.lastBackup = Date.now(); save();
+  toast('Sauvegarde téléchargée');
 }
 
 function ratesCard(e) {
@@ -7297,7 +7348,7 @@ function closeWizard(finish) {
   if (S.ach && wOn('ach')) {
     const nw = achievements(netWorthNow()).filter(x => x.ok && !S.ach[x.n]);
     nw.forEach(x => { S.ach[x.n] = 1; });
-    if (nw.length) { save(); toast(nw.length > 1 ? `🏆 ${nw.length} succès débloqués` : '🏆 Succès débloqué : ' + nw[0].n); }
+    if (nw.length) { save(); toast(nw.length > 1 ? `${nw.length} succès débloqués` : 'Succès débloqué : ' + nw[0].n); }
   }
   render();
 }
@@ -9870,7 +9921,7 @@ function heroChart() {
     const W = 320, Hc = 110;
     const scaleX = arr => { const t0 = new Date(arr[0].d).getTime(), ts = (new Date(arr[arr.length - 1].d).getTime() - t0) || 1; return d => ((new Date(d).getTime() - t0) / ts * W).toFixed(1); };
     let svg = '', from = null;
-    if (all.length < 2) kids.push(h('div', { class: 'n-hc-empty' }, 'La courbe apparaîtra dès demain, avec un deuxième point.'));
+    if (all.length < 2) { kids.push(h('div', { class: 'n-hc-empty' }, getIcon('clock', 14), 'Votre courbe démarre demain.')); wrap.replaceChildren(...kids); return; }
     else if (!HERO_CLS) {
       const X = scaleX(pts), mn = Math.min(...pts.map(x => x.v)), sp = (Math.max(...pts.map(x => x.v)) - mn) || 1, Y = v => (Hc - 8 - (v - mn) / sp * (Hc - 22)).toFixed(1);
       const ln = pts.map(x => X(x.d) + ' ' + Y(x.v)).join(' L');
@@ -9897,10 +9948,9 @@ function heroChart() {
       kids.unshift(h('div', { class: 'n-hc-d' }, h('span', null, short(from)), h('span', null, 'aujourd’hui')));
       kids.unshift(svgEl(`<svg class="n-curve" viewBox="0 0 ${W} ${Hc}" preserveAspectRatio="none" role="img" aria-label="Évolution du patrimoine">${svg}</svg>`));
     }
-    const off = PER.filter((_, i) => !enabled[i]).map(x => x[0]);
-    if (off.length && all.length) kids.push(h('div', { class: 'n-hc-note' }, `Historique depuis le ${short(all[0].d)} : ${off.join(', ')} se rempliront avec le temps.`));
+    // Seules les périodes déjà couvertes par l'historique sont proposées (v63)
     kids.push(h('div', { class: 'n-hc-ctl' },
-      h('div', { class: 'n-hc-per' }, ...PER.map(([l, d], i) => h('button', { 'aria-pressed': String(i === pi), disabled: !enabled[i], onclick: () => { S.histP = d; save(); draw(); } }, l))),
+      h('div', { class: 'n-hc-per' }, ...PER.map(([l, d], i) => !enabled[i] ? null : h('button', { 'aria-pressed': String(i === pi), disabled: !enabled[i], onclick: () => { S.histP = d; save(); draw(); } }, l))),
       h('button', { class: 'n-hc-cls', 'aria-pressed': String(HERO_CLS), onclick: () => { HERO_CLS = !HERO_CLS; draw(); } }, 'Par classe')));
     wrap.replaceChildren(...kids);
   };
@@ -9931,7 +9981,7 @@ function vToday() {
   // 1. Le résultat : la boule de neige et sa courbe
   const hero = h('div', { class: 'n-card n-hero' },
     h('button', { class: 'n-go', onclick: () => go('#/b') }, 'Projeter ›'), nKick(sbT('Votre snowball'), 'var(--ch1)'), h('div', { class: 'n-big num' }, nE(K.net)),
-    K.d30 != null ? h('div', { class: 'n-hero-d' }, h('div', null, nPos(K.d30), ' sur 30 jours'), K.d365 != null ? h('div', null, nPos(K.d365), ' sur 12 mois') : null) : nSub('Ce qui vous appartient vraiment, crédits et impôts déduits.'),
+    K.d30 != null ? h('div', { class: 'n-hero-d' }, h('div', null, nPos(K.d30), ' sur 30 jours'), K.d365 != null ? h('div', null, nPos(K.d365), ' sur 12 mois') : null) : nSub('Crédits et impôts déduits.'),
     heroChart());
   box.append(hero);
   countUp(hero.querySelector('.n-big'), K.net);
@@ -9940,16 +9990,17 @@ function vToday() {
   const X = goalCalc(), G = gl(), nDoneG = G.filter(g => isGoalDone(g, X[g.id] || { funded: 0 })).length;
   const T = getStrategy(nowYear()), planM = T.b.filter(b => b.m === nowMonth()).reduce((t, b) => t + b.amt, 0) + T.p.reduce((t, p) => t + p.amt, 0);
   const ess = (icon, col, light, k, sub, v, href) => h('button', { class: 'ess-row', style: `--cc: ${col}; --cl: ${light};`, onclick: () => go(href) },
-    h('span', { class: 'ess-ico' }, getIcon(icon, 17)), h('span', { class: 'ess-t' }, h('b', null, k), h('small', null, sub)), h('span', { class: 'ess-v num' }, v));
+    h('span', { class: 'ess-ico' }, getIcon(icon, 17)), h('span', { class: 'ess-t' }, h('b', null, k), h('small', null, sub)), h('span', { class: typeof v === 'string' ? 'ess-v num' : 'ess-v' }, v));
   box.append(nWh('L’essentiel'));
   box.append(h('div', { class: 'ess' },
-    ess('wallet', 'var(--ch1)', 'var(--ch1-l)', 'Mon argent', `${S.envs.length} compte${S.envs.length > 1 ? 's' : ''} et placements`, kE(K.a.v), '#/a'),
+    ess('wallet', 'var(--ch1)', 'var(--ch1-l)', 'Mon argent', `${S.envs.length} compte${S.envs.length > 1 ? 's' : ''} et placements`, nE(K.a.v), '#/a'),
     ess('percent', 'var(--ch2)', 'var(--ch2-l)', 'Mes coûts', K.B.rev > 0 ? 'il vous reste chaque mois' : 'frais des placements', K.B.rev > 0 ? nE(K.cap) : nE(K.sm.f) + ' / an', '#/n'),
-    ess('target', 'var(--ch3)', 'var(--ch3-l)', 'Mes projets', G.length ? `${nDoneG} sur ${G.length} atteint${nDoneG > 1 ? 's' : ''}` : 'aucun projet pour l’instant', G.length ? P0.format(G.reduce((t, g) => t + Math.min(g.target, (X[g.id] || { funded: 0 }).funded), 0) / Math.max(1, G.reduce((t, g) => t + g.target, 0))) : 'Ajouter', '#/g'),
+    ess('target', 'var(--ch3)', 'var(--ch3-l)', 'Mes projets', G.length ? `${nDoneG} sur ${G.length} atteint${nDoneG > 1 ? 's' : ''}` : 'aucun projet pour l’instant', G.length ? P0.format(G.reduce((t, g) => t + Math.min(g.target, (X[g.id] || { funded: 0 }).funded), 0) / Math.max(1, G.reduce((t, g) => t + g.target, 0))) : h('span', { class: 'n-pill', style: '--cc: var(--ch3); --cl: var(--ch3-l);' }, getIcon('plus', 13), 'Ajouter'), '#/g'),
     ess('trending-up', 'var(--ch4)', 'var(--ch4-l)', 'Mon plan', 'prévu ce mois-ci', nE(planM), '#/s')));
 
   // 3. Ce mois-ci : ce qu'il faut faire
-  const items = monthPlan();
+  const items = monthPlan(), bk = backupDue();
+  if (bk) items.unshift({ t: 'Sauvegarder mes données', s: bk, fn: () => { exportData(); setTimeout(render, 300); }, btn: 'Sauvegarder', col: 'var(--ch1)', cl: 'var(--ch1-l)' });
   box.append(nWh('Ce mois-ci', 'var(--ch4)'));
   box.append(items.length ? nTight(...items.slice(0, 6).map(x => h('div', { class: 'n-todo' + (x.done ? ' done' : ''), style: `--cc: ${x.col || 'var(--ch4)'};` },
       h('span', { class: 'n-ck' }, x.done ? '✓' : ''), h('div', { class: 'n-tt' }, h('b', null, x.t), h('span', null, x.s)),
@@ -9972,7 +10023,7 @@ function vToday() {
     const mx = Math.max(1, ...rows.map(r => Math.abs(r[1])));
     box.append(nWh('Pourquoi ça a bougé', 'var(--ch1)', '30 derniers jours'));
     box.append(nCard(h('div', { class: 'n-why' }, ...rows.flatMap(([k, v, c]) => [h('span', null, h('i', { style: `width: ${Math.max(4, Math.abs(v) / mx * 70).toFixed(0)}px; background: ${c};` }), k), h('b', { class: v >= 0 ? 'n-pos' : 'n-neg' }, sE(v))])),
-      nSub(P.delta > 0 && P.save > P.delta / 2 ? 'Plus de la moitié de la hausse vient de votre effort. 👏' : P.mk >= 0 ? 'Les marchés vous ont porté ce mois-ci.' : 'Les marchés ont baissé : votre épargne amortit la chute.')));
+      nSub(P.delta > 0 && P.save > P.delta / 2 ? 'Plus de la moitié de la hausse vient de votre effort.' : P.mk >= 0 ? 'Les marchés vous ont porté ce mois-ci.' : 'Les marchés ont baissé : votre épargne amortit la chute.')));
   }
 
   // 6. Vos 3 prochaines actions (santé financière)
@@ -10051,7 +10102,7 @@ function vMoney() {
     h('div', { class: 'n-kv' },
       h('div', null, h('span', null, 'Biens'), h('b', { class: 'num' }, nE(a.v))),
       K.debt > 0 ? h('div', null, h('span', null, 'Crédits'), h('b', { class: 'num n-neg' }, '− ' + nE(K.debt))) : null,
-      K.sm.t > 0 ? h('div', null, h('span', null, 'Impôts à venir'), h('b', { class: 'num n-neg' }, '− ' + nE(K.sm.t))) : null)));
+      K.sm.t > 0 ? h('div', null, h('span', null, 'Impôts à venir'), h('b', { class: 'num n-neg' }, '− ' + nE(K.sm.t))) : null), freshLine()));
   if (a.v > 0) {
     const cs = CLASSES.map((c, i) => { const es = classEnvs(c); return { c, i, n: es.length, x: agg(es.flatMap(e => e.lines)) }; }).filter(o => o.n && o.x.v > 0).sort((p, q) => q.x.v - p.x.v);
     box.append(nWh('Répartition', null, 'Par classe'));
@@ -10083,7 +10134,7 @@ function vCosts() {
   else box.append(nTight(nRow({ t: 'Renseignez votre budget', s: 'Revenus et dépenses du mois, en 2 minutes.', onclick: () => go('#/u'), vs: h('span', { class: 'n-pill' }, 'Commencer') })));
   if (L.items.length) {
     box.append(nWh(sbT('Ce qui fait fondre votre snowball'), 'var(--down)', 'Sur 20 ans'));
-    box.append(nTight(...L.items.map(x => nRow({ lead: h('span', { class: 'n-d' }, x.ico), t: x.t, s: x.s, tip: x.tip, v: '− ' + kE(x.v), vc: 'var(--down)' }))));
+    box.append(nTight(...L.items.map(x => nRow({ lead: h('span', { class: 'n-d' }, getIcon({ '%': 'percent', '€': 'wallet', '↗': 'trending-up', '⌂': 'home', '§': 'briefcase' }[x.ico] || 'info', 15)), t: x.t, s: x.s, tip: x.tip, v: '− ' + kE(x.v), vc: 'var(--down)' }))));
     box.append(nMore(sheetLeaks));
   }
   box.append(nWh('Tout le détail'),
@@ -10387,9 +10438,155 @@ window.addEventListener('hashchange', () => {
   window.scrollTo(0, 0);
 });
 
+/* ==================== CONFIANCE ET CONFORT (v63) ==================== */
+const APP_VERSION = 63;
+
+// --- Mode discret : masque tous les montants en euros affichés (l'appli et ses fenêtres), sans toucher aux données
+const MASK_RE = /(?:[−+–-]\s?)?\d[\d   .,]*\s?(?:k€|€)/g;
+const maskNode = n => { if (n.nodeType === 3) { if (MASK_RE.test(n.data)) { MASK_RE.lastIndex = 0; n.data = n.data.replace(MASK_RE, '••• €'); } MASK_RE.lastIndex = 0; return; }
+  if (n.nodeType !== 1 || n.matches('input, textarea, select, script, style')) return;
+  const w = document.createTreeWalker(n, NodeFilter.SHOW_TEXT); const list = []; while (w.nextNode()) list.push(w.currentNode); list.forEach(maskNode); };
+let maskObs = null;
+function applyDiscreet() {
+  document.documentElement.classList.toggle('discreet', !!S.hide);
+  const b = document.getElementById('btn-eye'); if (b) { b.innerHTML = eyeSvg(!!S.hide); b.setAttribute('aria-pressed', String(!!S.hide)); b.title = S.hide ? 'Afficher les montants' : 'Masquer les montants'; }
+  if (maskObs) { maskObs.disconnect(); maskObs = null; }
+  if (!S.hide) return;
+  const roots = ['#app', '#modal-root'].map(q => document.querySelector(q)).filter(Boolean);
+  roots.forEach(maskNode);
+  maskObs = new MutationObserver(ms => ms.forEach(m => { if (m.type === 'characterData') maskNode(m.target); else m.addedNodes.forEach(maskNode); }));
+  roots.forEach(r => maskObs.observe(r, { childList: true, subtree: true, characterData: true }));
+}
+const eyeSvg = off => off
+  ? '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+  : '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+function toggleDiscreet() {
+  S.hide = !S.hide; save();
+  if (!S.hide) { $('#modal-root').innerHTML = ''; render(); }
+  applyDiscreet();
+  toast(S.hide ? 'Montants masqués' : 'Montants affichés');
+}
+
+// --- Fraîcheur des données : cours et soldes saisis à la main
+const agoTxt = t => { const d = Math.floor((Date.now() - t) / 864e5); return d <= 0 ? 'aujourd’hui' : d === 1 ? 'hier' : `il y a ${d} jours`; };
+function freshLine() {
+  const parts = [];
+  const hasQ = allLines().some(l => l.m);
+  if (hasQ) parts.push(M.t ? `Cours ${new Date(M.t).toDateString() === new Date().toDateString() ? `à jour à ${new Date(M.t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : `du ${new Date(M.t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`}` : 'Cours pas encore chargés');
+  const ups = allLines().filter(l => !l.m && l.up && !/^Provision · /.test(l.name)).map(l => l.up);
+  if (ups.length) parts.push(`soldes saisis à la main : le plus ancien ${agoTxt(Math.min(...ups))}`);
+  return parts.length ? h('div', { class: 'n-fresh' }, getIcon('clock', 13), h('span', null, parts.join(' · '))) : null;
+}
+
+// --- Rappel de sauvegarde
+const BACKUP_DAYS = 30;
+function backupDue() {
+  if (!S.envs.length) return null;
+  if (S.lastBackup && Date.now() - S.lastBackup < BACKUP_DAYS * 864e5) return null;
+  return S.lastBackup ? `Dernière sauvegarde ${agoTxt(S.lastBackup)}` : 'Vos données n’ont jamais été sauvegardées';
+}
+
+// --- Verrouillage par code (facultatif) : un écran de confidentialité à l'ouverture.
+// Les données restent dans Safari : le code protège l'accès à l'appli, pas le contenu du navigateur.
+const pinHash = (code, salt) => { let x = 2166136261; for (const c of salt + ':' + code) { x ^= c.charCodeAt(0); x = Math.imul(x, 16777619) >>> 0; } return x.toString(16); };
+let LOCKED = false, hiddenAt = 0;
+function showLock() {
+  if (!S.pinH || LOCKED) return;
+  LOCKED = true;
+  let code = '';
+  const dots = h('div', { class: 'lk-dots' }, ...[0, 1, 2, 3].map(() => h('i'))), msg = h('div', { class: 'lk-msg' }, 'Entrez votre code');
+  const paint = () => dots.querySelectorAll('i').forEach((d, i) => d.classList.toggle('on', i < code.length));
+  const press = k => {
+    if (k === 'del') code = code.slice(0, -1);
+    else if (code.length < 4) code += k;
+    paint();
+    if (code.length === 4) {
+      if (pinHash(code, S.pinS) === S.pinH) { root.classList.add('out'); setTimeout(() => root.remove(), 250); LOCKED = false; }
+      else { msg.textContent = 'Code incorrect, réessayez'; dots.classList.add('shake'); setTimeout(() => { dots.classList.remove('shake'); code = ''; paint(); }, 450); }
+    }
+  };
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map(k => k === '' ? h('span') : h('button', { type: 'button', class: 'lk-k' + (k === 'del' ? ' del' : ''), 'aria-label': k === 'del' ? 'Effacer' : k, onclick: () => press(k) }, k === 'del' ? '⌫' : k));
+  const ic = document.querySelector('link[rel="apple-touch-icon"]');
+  const root = h('div', { id: 'lock', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'snowball est verrouillée' },
+    ic ? h('img', { src: ic.href, alt: '', class: 'lk-ic' }) : null, msg, dots, h('div', { class: 'lk-pad' }, ...keys),
+    h('button', { type: 'button', class: 'lk-forgot', onclick: () => openAlertModal('Code oublié', 'Pour votre sécurité, le code ne peut pas être retrouvé. Pour repartir de zéro : Réglages de l’iPhone → Safari → Avancé → Données des sites web → supprimez celles de ce site, puis restaurez votre dernière sauvegarde dans snowball.') }, 'Code oublié ?'));
+  document.body.append(root);
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) hiddenAt = Date.now();
+  else if (S.pinH && hiddenAt && Date.now() - hiddenAt > 60 * 1000) showLock();
+});
+function openPinModal() {
+  const root = $('#modal-root'), close = () => { root.innerHTML = ''; };
+  if (S.pinH) {
+    return openConfirmModal({ title: 'Retirer le code ?', message: 'snowball s’ouvrira sans code.', confirmText: 'Retirer le code', onConfirm: () => { delete S.pinH; delete S.pinS; save(); toast('Code retiré'); } });
+  }
+  const a = h('input', { type: 'password', inputmode: 'numeric', pattern: '[0-9]*', maxlength: 4, autocomplete: 'off', placeholder: '4 chiffres', 'aria-label': 'Nouveau code' });
+  const b = h('input', { type: 'password', inputmode: 'numeric', pattern: '[0-9]*', maxlength: 4, autocomplete: 'off', placeholder: 'Le même code', 'aria-label': 'Confirmez le code' });
+  const ok = () => {
+    if (!/^\d{4}$/.test(a.value)) { toast('Le code doit avoir 4 chiffres', 'warn'); return; }
+    if (a.value !== b.value) { toast('Les deux codes sont différents', 'warn'); return; }
+    S.pinS = Math.random().toString(36).slice(2, 10); S.pinH = pinHash(a.value, S.pinS); save(); close(); toast('Code activé', 'success');
+  };
+  const m = h('div', { class: 'modal-overlay', onclick: ev => { if (ev.target === m) close(); } },
+    h('div', { class: 'modal-sheet', style: 'max-width: 520px;' },
+      h('div', { class: 'modal-header' }, h('div', { class: 'modal-title' }, 'Verrouillage par code'), h('button', { class: 'btn-icon-only', 'aria-label': 'Fermer', onclick: close }, getIcon('x', 16))),
+      h('div', { class: 'modal-body' },
+        h('div', { class: 'set-note' }, 'Un code à 4 chiffres sera demandé à l’ouverture de snowball, et après une minute passée dans une autre application. Il empêche quelqu’un qui prend votre téléphone d’ouvrir l’appli.'),
+        h('div', { class: 'form-group', style: 'margin-bottom: 12px;' }, h('label', { class: 'form-label' }, 'Nouveau code'), a),
+        h('div', { class: 'form-group', style: 'margin-bottom: 12px;' }, h('label', { class: 'form-label' }, 'Confirmez le code'), b),
+        h('div', { class: 'set-note' }, 'Notez-le bien : il ne peut pas être retrouvé. Faites une sauvegarde de vos données avant de l’activer.')),
+      h('div', { class: 'modal-footer' }, h('button', { class: 'btn btn-primary', style: 'width: 100%;', onclick: ok }, 'Activer le code'))));
+  root.replaceChildren(m); setTimeout(() => a.focus(), 50);
+}
+
+// --- Confidentialité et à propos
+function openAboutModal() {
+  const root = $('#modal-root'), close = () => { root.innerHTML = ''; };
+  const blk = (ic, t, ...p) => h('div', { class: 'ab-b' }, h('div', { class: 'ab-h' }, getIcon(ic, 16), t), ...p.map(x => h('p', null, x)));
+  const m = h('div', { class: 'modal-overlay', onclick: ev => { if (ev.target === m) close(); } },
+    h('div', { class: 'modal-sheet', style: 'max-width: 520px;' },
+      h('div', { class: 'modal-header' }, h('div', { class: 'modal-title' }, 'Confidentialité et à propos'), h('button', { class: 'btn-icon-only', 'aria-label': 'Fermer', onclick: close }, getIcon('x', 16))),
+      h('div', { class: 'modal-body' },
+        h('div', { class: 'ab-top' }, h('img', { src: (document.querySelector('link[rel="apple-touch-icon"]') || {}).href || '', alt: '' }), h('div', null, h('b', null, sbT('snowball')), h('span', null, `Version ${APP_VERSION} · gestion de patrimoine personnelle`))),
+        blk('lock', 'Vos données restent chez vous',
+          'Tout est enregistré sur ce téléphone, dans Safari. Pas de compte, pas de serveur snowball, aucune banque connectée.',
+          'Rien n’est envoyé à qui que ce soit, sauf quand vous choisissez « Demander à une IA » : vos données sont alors copiées pour que vous les colliez vous-même dans l’IA de votre choix.'),
+        blk('shield', 'Ni publicité, ni pistage',
+          'snowball n’utilise aucun outil de mesure d’audience ni de publicité.',
+          'Pour afficher les cours, les polices et les logos, l’appli contacte des services publics (relais Google Apps Script, Google Fonts, sites de logos) : ils voient votre adresse internet, jamais vos montants.'),
+        blk('trending-up', 'D’où viennent les cours',
+          'Cours de Bourse et taux de change publics, récupérés par le relais Google Apps Script, avec un léger différé possible. Les soldes des livrets, contrats et biens sont ceux que vous saisissez.'),
+        blk('info', 'À savoir',
+          'Les calculs (impôts, projections, santé financière) sont indicatifs, basés sur les règles françaises 2026. snowball ne donne pas de conseil en investissement personnalisé.'),
+        blk('download', 'Sauvegarde',
+          S.lastBackup ? `Dernière sauvegarde ${agoTxt(S.lastBackup)}.` : 'Aucune sauvegarde pour l’instant.',
+          'Pensez à sauvegarder une fois par mois (Réglages → Mes données) : si Safari efface ses données, la sauvegarde permet de tout retrouver.')),
+      h('div', { class: 'modal-footer' }, h('button', { class: 'btn btn-primary', style: 'width: 100%;', onclick: close }, 'Fermer'))));
+  root.replaceChildren(m);
+}
+
+// --- Tirer vers le bas pour actualiser les cours
+(() => {
+  let y0 = null, dy = 0, ind = null;
+  const can = () => window.scrollY <= 0 && !WZ_OPEN && !LOCKED && !$('#modal-root').children.length && S.url;
+  window.addEventListener('touchstart', e => { y0 = can() ? e.touches[0].clientY : null; dy = 0; }, { passive: true });
+  window.addEventListener('touchmove', e => {
+    if (y0 == null) return; dy = e.touches[0].clientY - y0;
+    if (dy <= 0) { if (ind) ind.style.opacity = 0; return; }
+    if (!ind) { ind = h('div', { class: 'ptr' }, getIcon('rotate-ccw', 16)); document.body.append(ind); }
+    const p = Math.min(1, dy / 80); ind.style.opacity = p; ind.style.transform = `translate(-50%, ${Math.min(60, dy / 2)}px) rotate(${p * 270}deg)`; ind.classList.toggle('ready', p >= 1);
+  }, { passive: true });
+  window.addEventListener('touchend', () => {
+    if (ind) { const go = dy >= 80; ind.classList.add(go ? 'spin' : 'gone'); setTimeout(() => { if (ind) { ind.remove(); ind = null; } }, go ? 900 : 200); if (go) refreshQuotes(true); }
+    y0 = null; dy = 0;
+  }, { passive: true });
+})();
+
 // Démarrage initial
 window.addEventListener('load', () => {
-  render();
+  render(); applyDiscreet(); if (S.pinH) showLock();
+  const sp = document.getElementById('splash'); if (sp) { setTimeout(() => sp.classList.add('out'), 250); setTimeout(() => sp.remove(), 700); }
   if (S.wz && S.wz.open) openWizard();
   if (S.url) refreshQuotes();
   if (relayIsDefault() && !(S.relayV >= RELAY_VERSION)) relayPingSilent();
