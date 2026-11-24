@@ -894,6 +894,10 @@ body { background-color: var(--bg-app); letter-spacing: -0.005em; font-variant-n
 .lk-msg { font-size: 15px; font-weight: 600; color: var(--ink); }
 .lk-sub { font-size: 13px; color: var(--muted); margin-top: -10px; min-height: 18px; text-align: center; }
 .lk-sub:empty { display: none; }
+.pin-ov { z-index: 10001 !important; }
+.pin-ov .modal-footer { display: flex; gap: 10px; }
+.pin-ov .modal-footer .btn { flex: 1; }
+.pin-err { color: var(--down); font-size: 13px; font-weight: 600; min-height: 18px; margin-top: 8px; }
 .lk-dots { display: flex; gap: 16px; }
 .lk-dots i { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--ink-secondary); }
 .lk-dots i.on { background: var(--ink); border-color: var(--ink); }
@@ -6984,6 +6988,7 @@ function openSettingsModal() {
         sec('Sécurité et confidentialité',
           h('div', { class: 'set-card' },
             action('lock', S.pinH ? 'Retirer le code' : 'Verrouillage par code', S.pinH ? 'Un code est demandé à l’ouverture' : 'Facultatif · un code à 4 chiffres à l’ouverture', () => { close(); openPinModal(); }),
+            S.pinH && !S.pinQ ? action('alert-triangle', 'Ajouter la question de secours', 'Pour pouvoir choisir un nouveau code si vous l’oubliez', () => { close(); addSecretLater(); }) : null,
             action('info', 'Confidentialité et à propos', `Vos données, les sources, version ${APP_VERSION}`, () => { close(); openAboutModal(); }))),
         adv),
       h('div', { class: 'modal-footer' }, h('button', { class: 'btn btn-primary', style: 'width: 100%;', onclick: close }, 'Terminé'))));
@@ -10443,7 +10448,7 @@ window.addEventListener('hashchange', () => {
 });
 
 /* ==================== CONFIANCE ET CONFORT (v63) ==================== */
-const APP_VERSION = 65;
+const APP_VERSION = 66;
 
 // --- Mode discret : masque tous les montants en euros affichés (l'appli et ses fenêtres), sans toucher aux données
 const MASK_RE = /(?:[−+–-]\s?)?\d[\d   .,]*\s?(?:k€|€)/g;
@@ -10533,7 +10538,7 @@ function showLock() {
   LOCKED = true;
   pinPad({ title: 'Entrez votre code', onCode: (c, pad) => {
     if (pinHash(c, S.pinS) === S.pinH) { pad.close(); LOCKED = false; } else pad.retry('Code incorrect, réessayez');
-  }, forgot: () => openAlertModal('Code oublié', 'Pour votre sécurité, le code ne peut pas être retrouvé. Pour repartir de zéro : Réglages de l’iPhone → Safari → Avancé → Données des sites web → supprimez celles de ce site, puis restaurez votre dernière sauvegarde dans snowball.') });
+  }, forgot: () => forgotPin() });
 }
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) hiddenAt = Date.now();
@@ -10545,7 +10550,7 @@ function openPinModal() {
   if (S.pinH) {
     pinPad({ title: 'Entrez votre code actuel', sub: 'pour retirer le verrouillage', cancel: () => {}, onCode: (c, pad) => {
       if (pinHash(c, S.pinS) !== S.pinH) { pad.retry('Code incorrect, réessayez'); return; }
-      delete S.pinH; delete S.pinS; save(); pad.close(); toast('Code retiré : snowball s’ouvrira sans code');
+      delete S.pinH; delete S.pinS; delete S.pinQ; save(); pad.close(); toast('Code retiré : snowball s’ouvrira sans code'); render();
     } });
     return;
   }
@@ -10554,9 +10559,63 @@ function openPinModal() {
   pinPad({ title: 'Choisissez un code à 4 chiffres', sub: SUB1, cancel: () => {}, onCode: (c, pad) => {
     if (first == null) { first = c; pad.reset('Confirmez votre code', 'Tapez-le une deuxième fois'); return; }
     if (c !== first) { first = null; pad.retry('Les deux codes sont différents', 'Recommencez : choisissez un code à 4 chiffres'); return; }
-    S.pinS = Math.random().toString(36).slice(2, 10); S.pinH = pinHash(c, S.pinS); save(); pad.close();
-    toast('Code activé : il sera demandé à l’ouverture', 'success');
+    pad.close();
+    askSecret({ onSave: ans => { S.pinS = Math.random().toString(36).slice(2, 10); S.pinH = pinHash(c, S.pinS); S.pinQ = pinHash(normAns(ans), S.pinS); save(); toast('Code activé : il sera demandé à l’ouverture', 'success'); render(); },
+      onCancel: () => toast('Code non activé', 'warn') });
   } });
+}
+// Code créé avant la v66 : on vérifie le code actuel, puis on enregistre la réponse
+function addSecretLater() {
+  pinPad({ title: 'Entrez votre code actuel', sub: 'pour ajouter la question de secours', cancel: () => {}, onCode: (c, pad) => {
+    if (pinHash(c, S.pinS) !== S.pinH) { pad.retry('Code incorrect, réessayez'); return; }
+    pad.close(); askSecret({ onSave: ans => { S.pinQ = pinHash(normAns(ans), S.pinS); save(); toast('Question de secours enregistrée', 'success'); } });
+  } });
+}
+// Question de secours (v66) : « Nom de jeune fille de votre mère ». Majuscules, accents, espaces et tirets ne comptent pas.
+const PIN_QUESTION = 'Nom de jeune fille de votre mère';
+const normAns = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+// Petite fenêtre au-dessus de l'écran du code
+function pinSheet(title, kids, foot) {
+  const ov = h('div', { class: 'modal-overlay pin-ov' },
+    h('div', { class: 'modal-sheet', style: 'max-width: 520px;' },
+      h('div', { class: 'modal-header' }, h('div', { class: 'modal-title' }, title)),
+      h('div', { class: 'modal-body' }, ...kids), h('div', { class: 'modal-footer' }, ...foot)));
+  document.body.append(ov); return ov;
+}
+function askSecret({ onSave, onCancel }) {
+  const inp = h('input', { type: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', placeholder: 'Votre réponse', 'aria-label': PIN_QUESTION });
+  const ok = () => { if (normAns(inp.value).length < 2) { toast('Écrivez votre réponse', 'warn'); return; } ov.remove(); onSave(inp.value); };
+  const ov = pinSheet('Question de secours', [
+    h('div', { class: 'set-note' }, 'Si vous oubliez votre code, cette réponse vous permettra d’en choisir un nouveau.'),
+    h('div', { class: 'form-group' }, h('label', { class: 'form-label' }, PIN_QUESTION), inp),
+    h('div', { class: 'set-note', style: 'margin-top: 10px;' }, 'Les majuscules, les accents et les espaces ne comptent pas.')],
+    [h('button', { class: 'btn btn-secondary', onclick: () => { ov.remove(); if (onCancel) onCancel(); } }, 'Annuler'), h('button', { class: 'btn btn-primary', onclick: ok }, 'Enregistrer')]);
+  setTimeout(() => inp.focus(), 60);
+}
+// Code oublié : la bonne réponse permet de choisir un nouveau code
+function forgotPin() {
+  if (!S.pinQ) { openAlertModal('Code oublié', 'Aucune question de secours n’a été enregistrée avec ce code, il ne peut donc pas être réinitialisé ici. Pour repartir de zéro : Réglages de l’iPhone → Safari → Avancé → Données des sites web → supprimez celles de ce site, puis restaurez votre dernière sauvegarde dans snowball.'); const m = $('#modal-root .modal-overlay'); if (m) m.classList.add('pin-ov'); return; }
+  let tries = 0;
+  const inp = h('input', { type: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', placeholder: 'Votre réponse', 'aria-label': PIN_QUESTION });
+  const err = h('div', { class: 'pin-err' });
+  const check = () => {
+    if (pinHash(normAns(inp.value), S.pinS) !== S.pinQ) { tries++; err.textContent = tries >= 3 ? 'Réponse incorrecte. Vérifiez l’orthographe du nom.' : 'Réponse incorrecte, réessayez.'; inp.select(); return; }
+    ov.remove();
+    const lock = document.getElementById('lock'); if (lock) lock.remove();
+    let first = null;
+    pinPad({ title: 'Choisissez un nouveau code', sub: 'Réponse correcte', onCode: (c, pad) => {
+      if (first == null) { first = c; pad.reset('Confirmez votre nouveau code', 'Tapez-le une deuxième fois'); return; }
+      if (c !== first) { first = null; pad.retry('Les deux codes sont différents', 'Recommencez : choisissez un nouveau code'); return; }
+      const ans = S.pinQ; S.pinH = pinHash(c, S.pinS); S.pinQ = ans; save(); pad.close(); LOCKED = false;
+      toast('Nouveau code enregistré', 'success');
+    } });
+  };
+  inp.onkeydown = e => { if (e.key === 'Enter') check(); };
+  const ov = pinSheet('Code oublié', [
+    h('div', { class: 'set-note' }, 'Répondez à votre question de secours pour choisir un nouveau code. Vos données restent intactes.'),
+    h('div', { class: 'form-group' }, h('label', { class: 'form-label' }, PIN_QUESTION), inp), err],
+    [h('button', { class: 'btn btn-secondary', onclick: () => ov.remove() }, 'Annuler'), h('button', { class: 'btn btn-primary', onclick: check }, 'Valider')]);
+  setTimeout(() => inp.focus(), 60);
 }
 
 // --- Confidentialité et à propos
