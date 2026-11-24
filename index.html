@@ -892,6 +892,8 @@ body { background-color: var(--bg-app); letter-spacing: -0.005em; font-variant-n
 #lock.out { opacity: 0; }
 .lk-ic { width: 64px; height: 64px; border-radius: 16px; box-shadow: 0 6px 18px rgba(37, 99, 235, .22); }
 .lk-msg { font-size: 15px; font-weight: 600; color: var(--ink); }
+.lk-sub { font-size: 13px; color: var(--muted); margin-top: -10px; min-height: 18px; text-align: center; }
+.lk-sub:empty { display: none; }
 .lk-dots { display: flex; gap: 16px; }
 .lk-dots i { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--ink-secondary); }
 .lk-dots i.on { background: var(--ink); border-color: var(--ink); }
@@ -10439,7 +10441,7 @@ window.addEventListener('hashchange', () => {
 });
 
 /* ==================== CONFIANCE ET CONFORT (v63) ==================== */
-const APP_VERSION = 63;
+const APP_VERSION = 64;
 
 // --- Mode discret : masque tous les montants en euros affichés (l'appli et ses fenêtres), sans toucher aux données
 const MASK_RE = /(?:[−+–-]\s?)?\d[\d   .,]*\s?(?:k€|€)/g;
@@ -10490,54 +10492,59 @@ function backupDue() {
 // Les données restent dans Safari : le code protège l'accès à l'appli, pas le contenu du navigateur.
 const pinHash = (code, salt) => { let x = 2166136261; for (const c of salt + ':' + code) { x ^= c.charCodeAt(0); x = Math.imul(x, 16777619) >>> 0; } return x.toString(16); };
 let LOCKED = false, hiddenAt = 0;
-function showLock() {
-  if (!S.pinH || LOCKED) return;
-  LOCKED = true;
+// Pavé numérique plein écran, réutilisé pour ouvrir l'appli, créer le code et le retirer (v64)
+function pinPad({ title, sub, onCode, cancel, forgot }) {
   let code = '';
-  const dots = h('div', { class: 'lk-dots' }, ...[0, 1, 2, 3].map(() => h('i'))), msg = h('div', { class: 'lk-msg' }, 'Entrez votre code');
+  const dots = h('div', { class: 'lk-dots' }, ...[0, 1, 2, 3].map(() => h('i'))), msg = h('div', { class: 'lk-msg' }, title), note = h('div', { class: 'lk-sub' }, sub || '');
   const paint = () => dots.querySelectorAll('i').forEach((d, i) => d.classList.toggle('on', i < code.length));
+  const api = {
+    close: () => { root.classList.add('out'); setTimeout(() => root.remove(), 250); },
+    retry: (t, s2) => { if (t) msg.textContent = t; if (s2 != null) note.textContent = s2; dots.classList.add('shake'); setTimeout(() => { dots.classList.remove('shake'); code = ''; paint(); }, 450); },
+    reset: (t, s2) => { msg.textContent = t; note.textContent = s2 || ''; code = ''; paint(); }
+  };
   const press = k => {
-    if (k === 'del') code = code.slice(0, -1);
-    else if (code.length < 4) code += k;
+    if (k === 'del') code = code.slice(0, -1); else if (code.length < 4) code += k;
     paint();
-    if (code.length === 4) {
-      if (pinHash(code, S.pinS) === S.pinH) { root.classList.add('out'); setTimeout(() => root.remove(), 250); LOCKED = false; }
-      else { msg.textContent = 'Code incorrect, réessayez'; dots.classList.add('shake'); setTimeout(() => { dots.classList.remove('shake'); code = ''; paint(); }, 450); }
-    }
+    if (code.length === 4) { const c = code; setTimeout(() => onCode(c, api), 120); }
   };
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map(k => k === '' ? h('span') : h('button', { type: 'button', class: 'lk-k' + (k === 'del' ? ' del' : ''), 'aria-label': k === 'del' ? 'Effacer' : k, onclick: () => press(k) }, k === 'del' ? '⌫' : k));
   const ic = document.querySelector('link[rel="apple-touch-icon"]');
-  const root = h('div', { id: 'lock', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'snowball est verrouillée' },
-    ic ? h('img', { src: ic.href, alt: '', class: 'lk-ic' }) : null, msg, dots, h('div', { class: 'lk-pad' }, ...keys),
-    h('button', { type: 'button', class: 'lk-forgot', onclick: () => openAlertModal('Code oublié', 'Pour votre sécurité, le code ne peut pas être retrouvé. Pour repartir de zéro : Réglages de l’iPhone → Safari → Avancé → Données des sites web → supprimez celles de ce site, puis restaurez votre dernière sauvegarde dans snowball.') }, 'Code oublié ?'));
+  const root = h('div', { id: 'lock', role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
+    ic ? h('img', { src: ic.href, alt: '', class: 'lk-ic' }) : null, msg, note, dots, h('div', { class: 'lk-pad' }, ...keys),
+    cancel ? h('button', { type: 'button', class: 'lk-forgot', onclick: () => { api.close(); cancel(); } }, 'Annuler') : null,
+    forgot ? h('button', { type: 'button', class: 'lk-forgot', onclick: forgot }, 'Code oublié ?') : null);
   document.body.append(root);
+  return api;
+}
+function showLock() {
+  if (!S.pinH || LOCKED) return;
+  LOCKED = true;
+  pinPad({ title: 'Entrez votre code', onCode: (c, pad) => {
+    if (pinHash(c, S.pinS) === S.pinH) { pad.close(); LOCKED = false; } else pad.retry('Code incorrect, réessayez');
+  }, forgot: () => openAlertModal('Code oublié', 'Pour votre sécurité, le code ne peut pas être retrouvé. Pour repartir de zéro : Réglages de l’iPhone → Safari → Avancé → Données des sites web → supprimez celles de ce site, puis restaurez votre dernière sauvegarde dans snowball.') });
 }
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) hiddenAt = Date.now();
   else if (S.pinH && hiddenAt && Date.now() - hiddenAt > 60 * 1000) showLock();
 });
+// Créer le code : on le tape, puis on le confirme ; le retirer : il faut d'abord taper le code actuel
 function openPinModal() {
-  const root = $('#modal-root'), close = () => { root.innerHTML = ''; };
+  $('#modal-root').innerHTML = '';
   if (S.pinH) {
-    return openConfirmModal({ title: 'Retirer le code ?', message: 'snowball s’ouvrira sans code.', confirmText: 'Retirer le code', onConfirm: () => { delete S.pinH; delete S.pinS; save(); toast('Code retiré'); } });
+    pinPad({ title: 'Entrez votre code actuel', sub: 'pour retirer le verrouillage', cancel: () => {}, onCode: (c, pad) => {
+      if (pinHash(c, S.pinS) !== S.pinH) { pad.retry('Code incorrect, réessayez'); return; }
+      delete S.pinH; delete S.pinS; save(); pad.close(); toast('Code retiré : snowball s’ouvrira sans code');
+    } });
+    return;
   }
-  const a = h('input', { type: 'password', inputmode: 'numeric', pattern: '[0-9]*', maxlength: 4, autocomplete: 'off', placeholder: '4 chiffres', 'aria-label': 'Nouveau code' });
-  const b = h('input', { type: 'password', inputmode: 'numeric', pattern: '[0-9]*', maxlength: 4, autocomplete: 'off', placeholder: 'Le même code', 'aria-label': 'Confirmez le code' });
-  const ok = () => {
-    if (!/^\d{4}$/.test(a.value)) { toast('Le code doit avoir 4 chiffres', 'warn'); return; }
-    if (a.value !== b.value) { toast('Les deux codes sont différents', 'warn'); return; }
-    S.pinS = Math.random().toString(36).slice(2, 10); S.pinH = pinHash(a.value, S.pinS); save(); close(); toast('Code activé', 'success');
-  };
-  const m = h('div', { class: 'modal-overlay', onclick: ev => { if (ev.target === m) close(); } },
-    h('div', { class: 'modal-sheet', style: 'max-width: 520px;' },
-      h('div', { class: 'modal-header' }, h('div', { class: 'modal-title' }, 'Verrouillage par code'), h('button', { class: 'btn-icon-only', 'aria-label': 'Fermer', onclick: close }, getIcon('x', 16))),
-      h('div', { class: 'modal-body' },
-        h('div', { class: 'set-note' }, 'Un code à 4 chiffres sera demandé à l’ouverture de snowball, et après une minute passée dans une autre application. Il empêche quelqu’un qui prend votre téléphone d’ouvrir l’appli.'),
-        h('div', { class: 'form-group', style: 'margin-bottom: 12px;' }, h('label', { class: 'form-label' }, 'Nouveau code'), a),
-        h('div', { class: 'form-group', style: 'margin-bottom: 12px;' }, h('label', { class: 'form-label' }, 'Confirmez le code'), b),
-        h('div', { class: 'set-note' }, 'Notez-le bien : il ne peut pas être retrouvé. Faites une sauvegarde de vos données avant de l’activer.')),
-      h('div', { class: 'modal-footer' }, h('button', { class: 'btn btn-primary', style: 'width: 100%;', onclick: ok }, 'Activer le code'))));
-  root.replaceChildren(m); setTimeout(() => a.focus(), 50);
+  let first = null;
+  const SUB1 = 'Notez-le bien : il ne peut pas être retrouvé.';
+  pinPad({ title: 'Choisissez un code à 4 chiffres', sub: SUB1, cancel: () => {}, onCode: (c, pad) => {
+    if (first == null) { first = c; pad.reset('Confirmez votre code', 'Tapez-le une deuxième fois'); return; }
+    if (c !== first) { first = null; pad.retry('Les deux codes sont différents', 'Recommencez : choisissez un code à 4 chiffres'); return; }
+    S.pinS = Math.random().toString(36).slice(2, 10); S.pinH = pinHash(c, S.pinS); save(); pad.close();
+    toast('Code activé : il sera demandé à l’ouverture', 'success');
+  } });
 }
 
 // --- Confidentialité et à propos
