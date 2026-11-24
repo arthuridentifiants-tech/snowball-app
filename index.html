@@ -1682,6 +1682,14 @@ button.n-row { cursor: pointer; }
 .ai-hint { font-size: 13px; color: var(--ink-secondary); line-height: 1.4; margin-top: -4px; }
 .ai-sep { height: 1px; background: var(--border); margin: 4px 0; }
 .ai-apps a.ai-app.on { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.ai-apps a.ai-app.ready { border-color: var(--up); box-shadow: 0 0 0 1px var(--up); color: var(--up); }
+.ai-manual:empty { display: none; }
+.ai-manual { margin-top: 10px; padding: 12px; border-radius: 14px; background: var(--surface-alt); display: flex; flex-direction: column; gap: 10px; }
+.ai-manual-h { font-size: 13px; line-height: 1.45; color: var(--ink); }
+.ai-manual-t { width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); resize: vertical; }
+.ai-manual-b { display: flex; gap: 8px; flex-wrap: wrap; }
+.ai-manual-b .btn { flex: 1; justify-content: center; text-align: center; text-decoration: none; }
+.ai-mlink { border: 0; background: none; font: inherit; font-size: 12.5px; color: var(--muted); text-decoration: underline; padding: 6px 0 0; cursor: pointer; align-self: flex-start; }
 .ai-lbl { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14.5px; }
 .ai-lbl b { width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: var(--surface); display: grid; place-items: center; font-size: 12px; flex: none; }
 .ai-apps a.ai-app { border: 1px solid var(--border); background: var(--surface); color: var(--ink); font-weight: 600; }
@@ -9155,16 +9163,20 @@ function openAIModal() {
   // Étape 1 : les données seules (sans question) ; étape 2 : la question seule, collée dans la même discussion
   const context = () => buildAIPromptFull(null, anon.checked);
   const upd = () => { const t = context(); pre.textContent = t; stats.textContent = `${t.length.toLocaleString('fr-FR')} caractères`; };
-  // Copie immédiate, dans le geste même : méthode qui fonctionne dans Safari et la visionneuse de fichiers de l'iPhone,
-  // l'API presse-papiers n'est qu'un secours (sur iPhone, elle peut répondre « copié » sans rien copier)
-  const copyNow = t => {
-    const ta = h('textarea', { 'aria-hidden': 'true', style: 'position: fixed; top: 0; left: 0; width: 2em; height: 2em; padding: 0; border: 0; outline: 0; box-shadow: none; background: transparent; color: transparent; opacity: 0.01; font-size: 16px; z-index: -1;' });
+  // Copie (v56) : sur un site sécurisé (https, web app), méthode moderne du presse-papiers, attendue jusqu'au bout ;
+  // l'ancienne méthode (textarea + execCommand) ne sert que de secours. Renvoie une promesse : true si la copie a réussi.
+  const copyOld = t => {
+    const ta = h('textarea', { 'aria-hidden': 'true', style: 'position: fixed; top: 0; left: 0; width: 2em; height: 2em; padding: 0; border: 0; outline: 0; box-shadow: none; background: transparent; color: transparent; opacity: 0.01; font-size: 16px;' });
     ta.value = t; document.body.append(ta);
     ta.focus(); ta.select(); ta.setSelectionRange(0, t.length);
     let ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
-    ta.remove();
-    if (!ok && navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).catch(() => {}); ok = true; }
-    return ok;
+    ta.remove(); return ok;
+  };
+  const copyNow = t => {
+    if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+      try { return navigator.clipboard.writeText(t).then(() => true, () => copyOld(t)); } catch (e) {}
+    }
+    return Promise.resolve(copyOld(t));
   };
   // Applications IA (aucune préremplie ; ChatGPT a besoin d'un caractère invisible dans le lien pour ouvrir son app)
   const APPS = [['ChatGPT', 'https://chatgpt.com/?q=' + encodeURIComponent('​'), ['chatgpt.com', 'openai.com'], '#10A37F'], ['Claude', 'https://claude.ai/new', ['claude.ai', 'anthropic.com'], '#D97757'],
@@ -9181,28 +9193,60 @@ function openAIModal() {
     s2n.textContent = `Touchez une question : elle est copiée. Revenez dans ${aiName()} et collez-la dans la même discussion. Vous pouvez aussi l’écrire directement dans ${aiName()}.`;
     tiles.querySelectorAll('.ai-app').forEach(a => a.classList.toggle('on', a.dataset.n === ai));
   };
+  // 1er toucher : copie des données (la tuile devient « ✓ Ouvrir ») ; 2e toucher : l'IA s'ouvre
+  let ready = null;
+  const setReady = n => { ready = n; tiles.querySelectorAll('.ai-app').forEach(a => { const on = a.dataset.n === n; a.classList.toggle('ready', on); a.querySelector(':scope > span:last-child').textContent = on ? '✓ Ouvrir' : a.dataset.n; }); };
   const appLink = ([n, u, d, c]) => h('a', { class: 'ai-app', 'data-n': n, href: u, target: '_blank', rel: 'noopener', onclick: ev => {
-    if (copyNow(context())) { ai = n; try { localStorage.setItem('pf.ai', n); } catch (e) {} paint(); toast(`Données copiées : collez-les dans ${n}, puis envoyez`); }
-    else { ev.preventDefault(); toast('La copie n’a pas fonctionné, réessayez', 'warn'); }
+    if (ready === n) { manual.replaceChildren(); return; }
+    ev.preventDefault();
+    const t = context();
+    copyNow(t).then(ok => {
+      ai = n; try { localStorage.setItem('pf.ai', n); } catch (e) {} paint();
+      if (ok) { manual.replaceChildren(); setReady(n); toast(`Données copiées : touchez « Ouvrir », puis collez dans ${n}`); }
+      else { setReady(null); showManual(t, n, u); }
+    });
   } }, logoEl(d, n, 40, { color: c }), h('span', null, n));
   tiles.append(...APPS.map(appLink));
-  const copyQ = t => { t = (t || '').trim(); if (!t) { toast('Écrivez d’abord votre question', 'warn'); return; } const ok = copyNow(t); toast(ok ? `Question copiée : collez-la dans ${aiName()}` : 'La copie n’a pas fonctionné, réessayez', ok ? 'success' : 'warn'); };
+  // En dernier recours : le texte s'affiche, prêt à copier avec la bulle « Copier » de l'iPhone
+  const manual = h('div', { class: 'ai-manual' });
+  const showManual = (t, n, u) => {
+    const ta = h('textarea', { class: 'ai-manual-t', rows: 5, 'aria-label': 'Texte à copier' }); ta.value = t;
+    const sel = () => { ta.focus(); ta.select(); ta.setSelectionRange(0, t.length); };
+    manual.replaceChildren(
+      h('div', { class: 'ai-manual-h' }, h('b', null, 'La copie automatique n’a pas fonctionné.'), ' Touchez « Tout sélectionner », puis « Copier » dans la bulle de l’iPhone.'),
+      ta,
+      h('div', { class: 'ai-manual-b' },
+        h('button', { type: 'button', class: 'btn btn-secondary', onclick: sel }, 'Tout sélectionner'),
+        n ? h('a', { class: 'btn btn-primary', href: u, target: '_blank', rel: 'noopener' }, `Ouvrir ${n}`) : null));
+    manual.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); sel();
+  };
+  const qManual = h('div', { class: 'ai-manual' });
+  const copyQ = t => { t = (t || '').trim(); if (!t) { toast('Écrivez d’abord votre question', 'warn'); return; }
+    copyNow(t).then(ok => {
+      if (ok) { qManual.replaceChildren(); toast(`Question copiée : collez-la dans ${aiName()}`, 'success'); return; }
+      const ta = h('textarea', { class: 'ai-manual-t', rows: 3, 'aria-label': 'Question à copier' }); ta.value = t;
+      const sel = () => { ta.focus(); ta.select(); ta.setSelectionRange(0, t.length); };
+      qManual.replaceChildren(h('div', { class: 'ai-manual-h' }, h('b', null, 'La copie automatique n’a pas fonctionné.'), ' Touchez « Tout sélectionner », puis « Copier » dans la bulle de l’iPhone.'), ta,
+        h('div', { class: 'ai-manual-b' }, h('button', { type: 'button', class: 'btn btn-secondary', onclick: sel }, 'Tout sélectionner')));
+      qManual.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); sel();
+    }); };
   const q = h('textarea', { rows: 2, placeholder: 'Ou écrivez votre question…', 'aria-label': 'Votre question' });
-  anon.onchange = upd;
+  anon.onchange = () => { upd(); setReady(null); manual.replaceChildren(); };
   const m = h('div', { class: 'modal-overlay', onclick: ev => { if (ev.target === m) close(); } },
     h('div', { class: 'modal-sheet', style: 'max-width: 520px;' },
       h('div', { class: 'modal-header' }, h('div', { class: 'modal-title' }, 'Demander à une IA'), h('button', { class: 'btn-icon-only', 'aria-label': 'Fermer', onclick: close }, getIcon('x', 16))),
       h('div', { class: 'modal-body ai-body' },
         h('div', { class: 'ai-lbl' }, h('b', null, '1'), 'Envoyez vos données'),
-        h('div', { class: 'ai-hint' }, 'Touchez votre IA : vos données sont copiées et l’IA s’ouvre. Collez, puis envoyez.'),
-        tiles,
+        h('div', { class: 'ai-hint' }, 'Touchez votre IA : vos données sont copiées. Touchez « Ouvrir », puis collez et envoyez.'),
+        tiles, manual,
+        h('button', { type: 'button', class: 'ai-mlink', onclick: () => showManual(context(), ai, (APPS.find(a => a[0] === ai) || [])[1]) }, 'La copie ne marche pas ? Copier à la main'),
         h('label', { class: 'ai-anon' }, anon, h('span', null, h('b', null, 'Masquer les noms'), h('small', null, 'Banques, comptes et biens deviennent « Banque A », « PEA 1 »… Les montants restent.'))),
         h('details', { class: 'ai-prev' }, h('summary', null, 'Voir les données'), stats, pre),
         h('div', { class: 'ai-sep' }),
         s2t, s2n,
         h('div', { class: 'ai-chips' }, ...AI_QUESTIONS.map(t => h('button', { type: 'button', onclick: () => copyQ(t) }, t))),
         q,
-        h('button', { class: 'btn btn-primary ai-open', onclick: () => copyQ(q.value) }, 'Copier ma question'))));
+        h('button', { class: 'btn btn-primary ai-open', onclick: () => copyQ(q.value) }, 'Copier ma question'), qManual)));
   root.replaceChildren(m); upd(); paint();
 }
 
