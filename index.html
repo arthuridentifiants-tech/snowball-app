@@ -138,8 +138,6 @@ input, textarea {
   z-index: 40;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   padding: env(safe-area-inset-top, 0px) 14px 0;
   width: 100%;
   max-width: 100%;
@@ -874,7 +872,8 @@ body { font-size: 16px; line-height: 1.55; }
 body { background-color: var(--bg-app); letter-spacing: -0.005em; }
 
 /* Barre du haut et marque */
-.topbar { background: color-mix(in srgb, var(--surface) 88%, transparent); border-bottom-color: transparent; box-shadow: 0 1px 0 var(--border); }
+/* v62 : barre du haut opaque (plus d'effet flou sous l'heure et la batterie, en haut de l'écran) */
+.topbar { background: var(--surface); border-bottom-color: transparent; box-shadow: 0 1px 0 var(--border); }
 .brand { font-family: var(--font-display); font-weight: 600; font-size: 20px; letter-spacing: -0.01em; }
 /* Typographie du logo pour le mot « snowball » partout dans l'appli (v61) */
 .sb { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.01em; color: var(--primary); white-space: nowrap; font-style: normal; }
