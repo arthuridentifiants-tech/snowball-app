@@ -1684,19 +1684,14 @@ button.n-row { cursor: pointer; }
 .ai-sep { height: 1px; background: var(--border); margin: 4px 0; }
 .ai-apps a.ai-app.on { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
 .ai-manual:empty { display: none; }
-.ai-prof { display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 12px; padding: 11px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
-.ai-prof > svg:first-child { color: var(--primary); flex: none; }
-.ai-prof > svg:last-child { color: var(--muted); flex: none; }
-.ai-prof span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.ai-prof b { font-size: 14px; }
-.ai-prof small { font-size: 12px; color: var(--muted); }
+.ai-ctx { justify-self: center; display: inline-flex; align-items: center; gap: 6px; }
+.ai-back { justify-self: start; display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--primary); padding: 6px 0; cursor: pointer; }
 .prof-g { margin-bottom: 12px; }
 .ai-manual { margin-top: 10px; padding: 12px; border-radius: 14px; background: var(--surface-alt); display: flex; flex-direction: column; gap: 10px; }
 .ai-manual-h { font-size: 13px; line-height: 1.45; color: var(--ink); }
 .ai-manual-t { width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); resize: vertical; }
 .ai-manual-b { display: flex; gap: 8px; flex-wrap: wrap; }
 .ai-manual-b .btn { flex: 1; justify-content: center; text-align: center; text-decoration: none; }
-.ai-mlink { border: 0; background: none; font: inherit; font-size: 12.5px; color: var(--muted); text-decoration: underline; padding: 6px 0 0; cursor: pointer; align-self: flex-start; }
 .ai-lbl { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14.5px; }
 .ai-lbl b { width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: var(--surface); display: grid; place-items: center; font-size: 12px; flex: none; }
 .ai-apps a.ai-app { border: 1px solid var(--border); background: var(--surface); color: var(--ink); font-weight: 600; }
@@ -6924,13 +6919,12 @@ function openSettingsModal() {
         sec('Cours de la Bourse',
           h('div', { class: 'set-status' }, h('i', { class: live ? 'on' : '' }), live ? 'Cours en direct activés' : 'Cours en direct désactivés',
             live ? h('button', { class: 'btn btn-outline btn-sm', onclick: () => { refreshQuotes(true); } }, 'Actualiser') : h('button', { class: 'btn btn-primary btn-sm', onclick: () => { close(); openRelayModal(); } }, 'Activer'))),
-        sec('Demander à une IA',
-          h('div', { class: 'set-card' }, action('smile', 'Mon profil', 'Âge, impôts, contrats… pour des réponses d’IA plus précises', () => { close(); openProfileModal(); }))),
         sec('Mes données',
           h('div', { class: 'set-note' }, 'Vos données restent sur cet appareil, dans ce navigateur. Faites une sauvegarde de temps en temps.'),
           h('div', { class: 'set-card' },
             action('download', 'Sauvegarder mes données', 'Télécharge un fichier .json', exportData),
             action('upload', 'Restaurer une sauvegarde', 'Remplace les données actuelles', () => fileIn.click()),
+            action('smile', 'Mon profil', 'Facultatif · utilisé seulement si vous demandez l’avis d’une IA', () => { close(); openProfileModal(); }),
             action('compass', 'Refaire le questionnaire d’accueil', 'Pour revoir ou compléter vos réponses', () => { close(); openWizard('welcome'); })),
           fileIn),
         adv),
@@ -7176,7 +7170,9 @@ function wzFlow() {
   wzLoanItems().forEach(x => f.push('c-loan:' + x.key));
   f.push('c-rev');
   Object.keys(getBudget().groups).forEach(k => f.push('c-grp:' + k));
-  f.push('c-annual', 'c-sum', 'g-intro', 'g-goals', 's-intro', 's-plan', 'end');
+  f.push('c-annual', 'c-sum', 'g-intro', 'g-goals', 's-intro', 's-plan', 'u-intro', 'u-birth', 'u-fam', 'u-kids', 'u-pro', 'u-tmi', 'u-log', 'u-risk');
+  if (S.envs.some(e => OPEN_TYPES.includes(e.type))) f.push('u-open');
+  f.push('end');
   return f;
 }
 const wzYm = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
@@ -7622,7 +7618,51 @@ function wzTotalLine(e, n, label) {
   wzSave();
 }
 
+// Profil facultatif (v59) : un écran par question, toujours « Passer » possible ; un choix fait avancer tout seul
+const wzProfPick = (k, map, title, lead, num) => {
+  const Pr = prof(), cur = Pr[k] != null ? String(Pr[k]) : '';
+  return {
+    kicker: 'Facultatif', title, lead,
+    body: [wzChoices(Object.entries(map).map(([v, t]) => ({ t: t.split(' : ')[0], d: t.split(' : ')[1] || null, on: cur === v, fn: () => {
+      if (cur === v) delete Pr[k]; else Pr[k] = num ? +v : v;
+      wzSave(); wzDraw(false); if (cur !== v) setTimeout(() => wzMove(1), 250);
+    } })), Object.keys(map).length > 4 ? 2 : 0, 'compact')],
+    next: { label: cur ? 'Continuer' : 'Passer' }
+  };
+};
 const WZ_STEPS = {
+  /* ===== Vous, en quelques mots (facultatif) ===== */
+  'u-intro': () => ({
+    center: true, art: wzArt('smile'),
+    kicker: 'Facultatif',
+    title: 'Et vous, en quelques mots ?',
+    lead: 'Quelques questions sur vous, pour qu’une IA puisse vous conseiller précisément, surtout sur les impôts. Vous pouvez passer chacune d’elles.',
+    body: [wzNote('Comme tout le reste, vos réponses restent sur votre téléphone. Elles n’en sortent que si vous envoyez vos données à une IA, avec « Demander à une IA ».', 'ok')],
+    next: { label: 'Répondre (1 minute)' },
+    skip: 'Passer cette partie', skipFn: () => wzGo('end')
+  }),
+  'u-birth': () => {
+    const Pr = prof(), yNow = new Date().getFullYear();
+    const sel = h('select', { class: 'wz-sel', 'aria-label': 'Année de naissance' }, h('option', { value: '' }, 'Choisir l’année…'), ...Array.from({ length: 90 }, (_, i) => yNow - 16 - i).map(y => h('option', { value: y }, String(y))));
+    sel.value = Pr.birth ? String(Pr.birth) : '';
+    sel.onchange = () => { if (sel.value) Pr.birth = +sel.value; else delete Pr.birth; wzSave(); wzDraw(false); };
+    return { kicker: 'Facultatif', title: 'Votre année de naissance', lead: 'Elle aide à choisir l’horizon de vos placements et à préparer la retraite.', body: [sel], next: { label: Pr.birth ? 'Continuer' : 'Passer' } };
+  },
+  'u-fam': () => wzProfPick('fam', PROF_FAM, 'Votre situation familiale', 'Mariage et Pacs changent l’impôt et les abattements de l’assurance vie.'),
+  'u-kids': () => wzProfPick('kids', { 0: 'Aucun', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5 ou plus' }, 'Enfants à charge', 'Ils comptent pour l’impôt et pour vos projets.', true),
+  'u-pro': () => wzProfPick('pro', PROF_PRO, 'Votre situation professionnelle', 'Elle change les placements possibles (PER, épargne salariale…).'),
+  'u-tmi': () => wzProfPick('tmi', PROF_TMI, 'Votre tranche d’imposition', 'Elle figure sur votre avis d’impôt (« taux marginal d’imposition »). Indispensable pour comparer PER, assurance vie et compte-titres.', true),
+  'u-log': () => wzProfPick('log', PROF_LOG, 'Votre logement', null),
+  'u-risk': () => wzProfPick('risk', PROF_RISK, 'Votre goût du risque', 'Face à une baisse des marchés, vous êtes plutôt…'),
+  'u-open': () => {
+    const Pr = prof(); Pr.open = Pr.open || {};
+    const rows = S.envs.filter(e => OPEN_TYPES.includes(e.type)).map(e => {
+      const i = h('input', { type: 'month', value: Pr.open[e.id] || '', max: new Date().toISOString().slice(0, 7), 'aria-label': `Date d’ouverture de ${e.name}` });
+      i.onchange = () => { if (i.value) Pr.open[e.id] = i.value; else delete Pr.open[e.id]; wzSave(); };
+      return h('div', { class: 'form-group', style: 'margin-bottom: 12px;' }, h('label', { class: 'form-label' }, e.name), i);
+    });
+    return { kicker: 'Facultatif', title: 'Depuis quand avez-vous ces contrats ?', lead: 'L’ancienneté change l’impôt : 5 ans pour un PEA, 8 ans pour une assurance vie. Le mois et l’année suffisent.', body: rows, next: { label: 'Continuer' } };
+  },
   /* ===== Accueil ===== */
   welcome: () => ({
     center: true, back: false,
@@ -9304,7 +9344,7 @@ function openProfileModal(back) {
     h('div', { class: 'modal-sheet', style: 'max-width: 520px;' },
       h('div', { class: 'modal-header' }, h('div', { class: 'modal-title' }, 'Mon profil'), h('button', { class: 'btn-icon-only', 'aria-label': 'Fermer', onclick: close }, getIcon('x', 16))),
       h('div', { class: 'modal-body' },
-        h('div', { class: 'set-note' }, 'Tout est facultatif. Ces réponses restent sur votre téléphone et servent seulement quand vous demandez l’avis d’une IA : elle pourra vous conseiller beaucoup plus précisément, surtout sur les impôts.'),
+        h('div', { class: 'set-note' }, 'Tout est facultatif. Vos réponses restent sur votre téléphone : elles n’en sortent que si vous envoyez vos données à une IA, pour qu’elle vous conseille plus précisément, surtout sur les impôts.'),
         grp('Année de naissance', birth),
         grp('Situation familiale', sel('fam', PROF_FAM, 'Choisir…')),
         grp('Enfants à charge', kids),
@@ -9323,7 +9363,7 @@ function openAIModal() {
   const root = $('#modal-root'), close = () => { root.innerHTML = ''; };
   const anon = h('input', { type: 'checkbox', checked: true });
   const pre = h('pre', { class: 'ai-pre' }), stats = h('div', { class: 'ai-stats' });
-  // Étape 1 : les données seules (sans question) ; étape 2 : la question seule, collée dans la même discussion
+  // Écran 1 : choisir l'IA (copie du contexte et ouverture) ; écran 2 : copier une question, à coller dans la même discussion
   const context = () => buildAIPromptFull(null, anon.checked);
   const upd = () => { const t = context(); pre.textContent = t; stats.textContent = `${t.length.toLocaleString('fr-FR')} caractères`; };
   // Copie (v56) : sur un site sécurisé (https, web app), méthode moderne du presse-papiers, attendue jusqu'au bout ;
@@ -9345,71 +9385,62 @@ function openAIModal() {
   const APPS = [['ChatGPT', 'https://chatgpt.com/?q=' + encodeURIComponent('​'), ['chatgpt.com', 'openai.com'], '#10A37F'], ['Claude', 'https://claude.ai/new', ['claude.ai', 'anthropic.com'], '#D97757'],
     ['Gemini', 'https://gemini.google.com/app', ['gemini.google.com', 'gemini.google'], '#4285F4'], ['Le Chat', 'https://chat.mistral.ai/chat', ['chat.mistral.ai', 'mistral.ai'], '#FA520F'],
     ['Perplexity', 'https://www.perplexity.ai/', ['perplexity.ai', 'www.perplexity.ai'], '#20808D'], ['Grok', 'https://grok.com/', ['grok.com', 'x.ai'], '#111111']];
-  // L'IA choisie à l'étape 1 est retenue pour l'étape 2
   let ai = null; try { ai = localStorage.getItem('pf.ai'); } catch (e) {}
   if (!APPS.some(a => a[0] === ai)) ai = null;
-  const aiName = () => ai || 'votre IA';
-  const s2t = h('div', { class: 'ai-lbl' }), s2n = h('div', { class: 'ai-hint' });
-  const tiles = h('div', { class: 'ai-apps' });
-  const paint = () => {
-    s2t.replaceChildren(h('b', null, '2'), `Posez votre question dans ${aiName()}`);
-    s2n.textContent = `Touchez une question : elle est copiée. Revenez dans ${aiName()} et collez-la dans la même discussion. Vous pouvez aussi l’écrire directement dans ${aiName()}.`;
-    tiles.querySelectorAll('.ai-app').forEach(a => a.classList.toggle('on', a.dataset.n === ai));
-  };
-  // Un seul toucher (comme en v55) : copie immédiate du contexte dans le geste, puis l'IA s'ouvre
   const copySync = t => {
     let ok = copyOld(t);
     if (!ok && navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).catch(() => {}); ok = true; }
     return ok;
   };
-  const appLink = ([n, u, d, c]) => h('a', { class: 'ai-app', 'data-n': n, href: u, target: '_blank', rel: 'noopener', onclick: ev => {
+  // Si la copie automatique échoue : le texte s'affiche, prêt à copier avec la bulle « Copier » de l'iPhone
+  const manualBox = (t, extra) => {
+    const ta = h('textarea', { class: 'ai-manual-t', rows: 4, 'aria-label': 'Texte à copier' }); ta.value = t;
+    const sel = () => { ta.focus(); ta.select(); ta.setSelectionRange(0, t.length); };
+    const box = h('div', { class: 'ai-manual' }, h('div', { class: 'ai-manual-h' }, h('b', null, 'La copie automatique n’a pas fonctionné.'), ' Touchez « Tout sélectionner », puis « Copier » dans la bulle de l’iPhone.'), ta,
+      h('div', { class: 'ai-manual-b' }, h('button', { type: 'button', class: 'btn btn-secondary', onclick: sel }, 'Tout sélectionner'), extra || null));
+    setTimeout(() => { box.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); sel(); }, 30);
+    return box;
+  };
+  const body = h('div', { class: 'modal-body ai-body' });
+  const tiles = h('div', { class: 'ai-apps' }), manual = h('div');
+  const appLink = ([n, u, d, c]) => h('a', { class: 'ai-app' + (n === ai ? ' on' : ''), 'data-n': n, href: u, target: '_blank', rel: 'noopener', onclick: ev => {
     const t = context();
-    if (copySync(t)) { manual.replaceChildren(); ai = n; try { localStorage.setItem('pf.ai', n); } catch (e) {} paint(); toast(`Données copiées : collez-les dans ${n}, puis envoyez`); }
-    else { ev.preventDefault(); ai = n; paint(); showManual(t, n, u); }
+    ai = n; try { localStorage.setItem('pf.ai', n); } catch (e) {}
+    if (copySync(t)) { toast(`Données copiées : collez-les dans ${n}, puis envoyez`); setTimeout(step2, 400); }
+    else { ev.preventDefault(); manual.replaceChildren(manualBox(t, h('a', { class: 'btn btn-primary', href: u, target: '_blank', rel: 'noopener', onclick: () => setTimeout(step2, 400) }, `Ouvrir ${n}`))); }
   } }, logoEl(d, n, 40, { color: c }), h('span', null, n));
   tiles.append(...APPS.map(appLink));
-  // En dernier recours : le texte s'affiche, prêt à copier avec la bulle « Copier » de l'iPhone
-  const manual = h('div', { class: 'ai-manual' });
-  const showManual = (t, n, u) => {
-    const ta = h('textarea', { class: 'ai-manual-t', rows: 5, 'aria-label': 'Texte à copier' }); ta.value = t;
-    const sel = () => { ta.focus(); ta.select(); ta.setSelectionRange(0, t.length); };
-    manual.replaceChildren(
-      h('div', { class: 'ai-manual-h' }, h('b', null, 'La copie automatique n’a pas fonctionné.'), ' Touchez « Tout sélectionner », puis « Copier » dans la bulle de l’iPhone.'),
-      ta,
-      h('div', { class: 'ai-manual-b' },
-        h('button', { type: 'button', class: 'btn btn-secondary', onclick: sel }, 'Tout sélectionner'),
-        n ? h('a', { class: 'btn btn-primary', href: u, target: '_blank', rel: 'noopener' }, `Ouvrir ${n}`) : null));
-    manual.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); sel();
+  const copyCtx = () => { const t = context(); copyNow(t).then(ok => { if (ok) { manual.replaceChildren(); toast('Contexte copié : collez-le où vous voulez', 'success'); } else manual.replaceChildren(manualBox(t)); }); };
+  const step1 = () => {
+    body.replaceChildren(
+      h('div', { class: 'ai-hint' }, 'Touchez votre IA : vos données sont copiées et l’IA s’ouvre. Collez, puis envoyez. Revenez ensuite ici pour copier une question.'),
+      tiles, manual,
+      h('button', { type: 'button', class: 'btn btn-outline btn-sm ai-ctx', onclick: copyCtx }, getIcon('copy', 15), 'Copier mon contexte personnel financier'),
+      h('label', { class: 'ai-anon' }, anon, h('span', null, h('b', null, 'Masquer les noms'), h('small', null, 'Banques, comptes et biens deviennent « Banque A », « PEA 1 »… Les montants restent.'))),
+      h('details', { class: 'ai-prev' }, h('summary', null, 'Voir les données'), stats, pre));
   };
-  const qManual = h('div', { class: 'ai-manual' });
-  const copyQ = t => { t = (t || '').trim(); if (!t) { toast('Écrivez d’abord votre question', 'warn'); return; }
-    copyNow(t).then(ok => {
-      if (ok) { qManual.replaceChildren(); toast(`Question copiée : collez-la dans ${aiName()}`, 'success'); return; }
-      const ta = h('textarea', { class: 'ai-manual-t', rows: 3, 'aria-label': 'Question à copier' }); ta.value = t;
-      const sel = () => { ta.focus(); ta.select(); ta.setSelectionRange(0, t.length); };
-      qManual.replaceChildren(h('div', { class: 'ai-manual-h' }, h('b', null, 'La copie automatique n’a pas fonctionné.'), ' Touchez « Tout sélectionner », puis « Copier » dans la bulle de l’iPhone.'), ta,
-        h('div', { class: 'ai-manual-b' }, h('button', { type: 'button', class: 'btn btn-secondary', onclick: sel }, 'Tout sélectionner')));
-      qManual.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); sel();
-    }); };
-  const q = h('textarea', { rows: 2, placeholder: 'Ou écrivez votre question…', 'aria-label': 'Votre question' });
+  // Écran 2 : une question toute prête (ou la sienne), copiée pour être collée dans la même discussion
+  const step2 = () => {
+    const name = ai || 'votre IA', qbox = h('div');
+    const copyQ = t => { t = (t || '').trim(); if (!t) { toast('Écrivez d’abord votre question', 'warn'); return; }
+      copyNow(t).then(ok => { if (ok) { qbox.replaceChildren(); toast(`Question copiée : collez-la dans ${name}`, 'success'); } else qbox.replaceChildren(manualBox(t)); }); };
+    const q = h('textarea', { rows: 2, placeholder: 'Ou écrivez votre question…', 'aria-label': 'Votre question' });
+    body.replaceChildren(
+      h('div', { class: 'ai-lbl' }, h('b', null, '2'), `Posez votre question dans ${name}`),
+      h('div', { class: 'ai-hint' }, `Vos données sont copiées : collez-les dans ${name} et envoyez. Ensuite, touchez une question ici : elle est copiée. Revenez dans ${name} et collez-la dans la même discussion.`),
+      h('div', { class: 'ai-chips' }, ...AI_QUESTIONS.map(t => h('button', { type: 'button', onclick: () => copyQ(t) }, t))),
+      q,
+      h('button', { class: 'btn btn-primary ai-open', onclick: () => copyQ(q.value) }, 'Copier ma question'),
+      qbox,
+      h('button', { type: 'button', class: 'ai-back', onclick: () => { step1(); } }, getIcon('chevron-left', 15), 'Changer d’IA ou recopier mes données'));
+    body.scrollTop = 0;
+  };
   anon.onchange = () => { upd(); manual.replaceChildren(); };
   const m = h('div', { class: 'modal-overlay', onclick: ev => { if (ev.target === m) close(); } },
     h('div', { class: 'modal-sheet', style: 'max-width: 520px;' },
       h('div', { class: 'modal-header' }, h('div', { class: 'modal-title' }, 'Demander à une IA'), h('button', { class: 'btn-icon-only', 'aria-label': 'Fermer', onclick: close }, getIcon('x', 16))),
-      h('div', { class: 'modal-body ai-body' },
-        h('div', { class: 'ai-lbl' }, h('b', null, '1'), 'Envoyez vos données'),
-        h('div', { class: 'ai-hint' }, 'Touchez votre IA : vos données sont copiées et l’IA s’ouvre. Collez, puis envoyez.'),
-        tiles, manual,
-        h('button', { type: 'button', class: 'ai-mlink', onclick: () => showManual(context(), ai, (APPS.find(a => a[0] === ai) || [])[1]) }, 'La copie ne marche pas ? Copier à la main'),
-        h('label', { class: 'ai-anon' }, anon, h('span', null, h('b', null, 'Masquer les noms'), h('small', null, 'Banques, comptes et biens deviennent « Banque A », « PEA 1 »… Les montants restent.'))),
-        h('button', { type: 'button', class: 'ai-prof', onclick: () => openProfileModal(openAIModal) }, getIcon('smile', 16), h('span', null, h('b', null, 'Mon profil'), h('small', null, profDone() ? 'Complété : l’IA en tient compte' : 'Âge, impôts, contrats… pour des réponses plus précises')), getIcon('chevron-right', 16)),
-        h('details', { class: 'ai-prev' }, h('summary', null, 'Voir les données'), stats, pre),
-        h('div', { class: 'ai-sep' }),
-        s2t, s2n,
-        h('div', { class: 'ai-chips' }, ...AI_QUESTIONS.map(t => h('button', { type: 'button', onclick: () => copyQ(t) }, t))),
-        q,
-        h('button', { class: 'btn btn-primary ai-open', onclick: () => copyQ(q.value) }, 'Copier ma question'), qManual)));
-  root.replaceChildren(m); upd(); paint();
+      body));
+  step1(); root.replaceChildren(m); upd();
 }
 
 /* ==================== INTERFACE (maquette v4) ====================
