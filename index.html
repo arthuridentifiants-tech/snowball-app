@@ -9072,6 +9072,13 @@ function buildAIPromptFull(question, anon) {
 
   // question === null : données seules, la question viendra dans le message suivant
   if (question !== null) { P('## Ma question'); P(question || AI_QUESTIONS[0]); P(''); }
+  else {
+    P('## Consigne : ne réponds pas encore');
+    P('Ce message contient uniquement le contexte : ma situation financière, à lire et à garder en mémoire pour toute la discussion. Il ne contient pas de question.');
+    P('Ne fais aucune analyse, aucun commentaire, aucun conseil et ne me pose aucune question. Réponds seulement par ces deux mots : « Bien reçu. »');
+    P('Ma question arrivera dans mon prochain message : tu y répondras alors en t’appuyant sur ces données.');
+    P('');
+  }
   P('Tu es un conseiller en gestion de patrimoine pédagogue. Voici la situation financière complète d’un particulier, exportée de son application de suivi « snowball ».');
   P('Réponds en français, simplement, avec des chiffres tirés de ces données, en expliquant les termes techniques. Rappelle que ce n’est pas un conseil en investissement personnalisé.');
   P(`Données au ${today.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}. Montants en euros.`);
@@ -9138,7 +9145,7 @@ function buildAIPromptFull(question, anon) {
   if (D) { P(''); P(`## Santé financière calculée par l’appli : ${D.score}/100`); D.cr.forEach(c => P(`- ${c.n} : ${c.p}/25 · ${c.v || ''}`)); }
   P('');
   P('Repères fiscaux 2026 utilisés : prélèvements sur les gains 18,6 % (PEA de plus de 5 ans), 31,4 % (compte-titres, crypto), assurance vie 17,2 % à 30 % selon l’ancienneté ; Livret A 1,7 %.');
-  if (question === null) { P(''); P('Ma question arrive dans le message suivant. Pour l’instant, réponds seulement : « Bien reçu. Quelle est votre question ? »'); }
+  if (question === null) { P(''); P('## Rappel'); P('Fin du contexte. Ne réponds rien d’autre que « Bien reçu. » : ni analyse, ni conseil, ni question. Ma question arrive dans le message suivant.'); }
   return out.join('\n');
 }
 function openAIModal() {
