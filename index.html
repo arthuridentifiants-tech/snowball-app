@@ -901,7 +901,9 @@ body { background-color: var(--bg-app); letter-spacing: -0.005em; font-variant-n
 @keyframes lkShake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
 .lk-pad { display: grid; grid-template-columns: repeat(3, 72px); gap: 14px 22px; margin-top: 8px; }
 .lk-k { width: 72px; height: 72px; border-radius: 50%; border: 0; background: var(--surface-alt); color: var(--ink); font: inherit; font-size: 26px; font-weight: 500; cursor: pointer; }
-.lk-k:active { background: var(--border); }
+.lk-k { touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; transition: background .12s; }
+.lk-k:active, .lk-k.down { background: var(--border); }
+#lock { touch-action: manipulation; user-select: none; -webkit-user-select: none; }
 .lk-k.del { background: none; font-size: 22px; }
 .lk-forgot { border: 0; background: none; font: inherit; font-size: 13px; color: var(--muted); text-decoration: underline; cursor: pointer; margin-top: 6px; }
 .ab-top { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
@@ -10441,7 +10443,7 @@ window.addEventListener('hashchange', () => {
 });
 
 /* ==================== CONFIANCE ET CONFORT (v63) ==================== */
-const APP_VERSION = 64;
+const APP_VERSION = 65;
 
 // --- Mode discret : masque tous les montants en euros affichés (l'appli et ses fenêtres), sans toucher aux données
 const MASK_RE = /(?:[−+–-]\s?)?\d[\d   .,]*\s?(?:k€|€)/g;
@@ -10507,7 +10509,17 @@ function pinPad({ title, sub, onCode, cancel, forgot }) {
     paint();
     if (code.length === 4) { const c = code; setTimeout(() => onCode(c, api), 120); }
   };
-  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map(k => k === '' ? h('span') : h('button', { type: 'button', class: 'lk-k' + (k === 'del' ? ' del' : ''), 'aria-label': k === 'del' ? 'Effacer' : k, onclick: () => press(k) }, k === 'del' ? '⌫' : k));
+  // Réaction dès que le doigt se pose (pointerdown), sans attendre le « clic » : aucun toucher rapide n'est perdu (v65)
+  const hit = (b, k) => { b.classList.add('down'); setTimeout(() => b.classList.remove('down'), 140); press(k); };
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map(k => {
+    if (k === '') return h('span');
+    const b = h('button', { type: 'button', class: 'lk-k' + (k === 'del' ? ' del' : ''), 'aria-label': k === 'del' ? 'Effacer' : k,
+      onpointerdown: e => { e.preventDefault(); hit(b, k); },
+      onclick: e => { if (e.detail === 0) hit(b, k); } }, k === 'del' ? '⌫' : k);
+    return b;
+  });
+  const onKey = e => { if (!document.body.contains(root)) { document.removeEventListener('keydown', onKey); return; } if (/^\d$/.test(e.key)) press(e.key); else if (e.key === 'Backspace') press('del'); };
+  document.addEventListener('keydown', onKey);
   const ic = document.querySelector('link[rel="apple-touch-icon"]');
   const root = h('div', { id: 'lock', role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
     ic ? h('img', { src: ic.href, alt: '', class: 'lk-ic' }) : null, msg, note, dots, h('div', { class: 'lk-pad' }, ...keys),
